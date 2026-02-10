@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Geant4MinimalConfig",
+  "type": "object",
+  "properties": {
+    "geometry": {
+      "type": "object",
+      "description": "Geometry structure and parameters (Assembly DSL or references)",
+      "properties": {
+        "structure": {"type": "string"},
+        "params": {"type": "object"},
+        "volume_names": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Optional list of volume names for material mapping"
+        }
+      },
+      "required": ["structure", "params"],
+      "additionalProperties": true
+    },
+    "materials": {
+      "type": "object",
+      "description": "Material mapping and environment",
+      "properties": {
+        "volume_material_map": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "volume": {"type": "string"},
+              "material": {"type": "string"}
+            },
+            "required": ["volume", "material"],
+            "additionalProperties": false
+          }
+        },
+        "environment": {
+          "type": "object",
+          "properties": {
+            "atmosphere": {"type": "string"},
+            "temperature_K": {"type": "number"},
+            "pressure_Pa": {"type": "number"}
+          },
+          "additionalProperties": true
+        }
+      },
+      "required": ["volume_material_map"],
+      "additionalProperties": true
+    },
+    "physics_list": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Geant4 physics list name (see knowledge/data/physics_lists.json)"
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": true
+    },
+    "source": {
+      "type": "object",
+      "description": "Primary generator settings",
+      "properties": {
+        "particle": {
+          "type": "string",
+          "description": "Particle name (see knowledge/data/particles.json)"
+        },
+        "energy_MeV": {"type": "number"},
+        "position": {
+          "type": "object",
+          "properties": {
+            "type": {"type": "string"},
+            "value": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3}
+          },
+          "required": ["type", "value"]
+        },
+        "direction": {
+          "type": "object",
+          "properties": {
+            "type": {"type": "string"},
+            "value": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3}
+          },
+          "required": ["type", "value"]
+        }
+      },
+      "required": ["particle", "energy_MeV", "position", "direction"],
+      "additionalProperties": true
+    },
+    "output": {
+      "type": "object",
+      "description": "Output/scoring settings",
+      "properties": {
+        "format": {
+          "type": "string",
+          "description": "Output format (see knowledge/data/output_formats.json)"
+        },
+        "path": {"type": "string"}
+      },
+      "required": ["format", "path"],
+      "additionalProperties": true
+    }
+  },
+  "required": ["geometry", "materials", "physics_list", "source", "output"],
+  "additionalProperties": false
+}

@@ -43,3 +43,21 @@ def chat(
     with urllib.request.urlopen(req, timeout=cfg.timeout_s) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
+
+def extract_json(text: str) -> Dict[str, Any] | None:
+    text = text.strip()
+    if text.startswith("{") and text.endswith("}"):
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return None
+    # Fallback: find first JSON object
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        snippet = text[start : end + 1]
+        try:
+            return json.loads(snippet)
+        except json.JSONDecodeError:
+            return None
+    return None

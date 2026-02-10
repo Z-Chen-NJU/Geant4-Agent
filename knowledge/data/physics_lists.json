@@ -1,0 +1,28 @@
+{
+  "source": "https://geant4.web.cern.ch/documentation/dev/plg_html/PhysicsListGuide/physicslistguide.html",
+  "fetched_at": "2026-02-10T08:33:58.583479Z",
+  "items": [
+    "FTFP_BERT",
+    "FTFP_BERT_ATL",
+    "FTFP_BERT_HP",
+    "FTFP_BERT_TRV",
+    "FTFP_INCLXX",
+    "FTFQGSP_BERT",
+    "FTF_BIC",
+    "LBE",
+    "NuBeam",
+    "QBBC",
+    "QBBC_ABLA",
+    "QGSP_BERT",
+    "QGSP_BERT_HP",
+    "QGSP_BIC",
+    "QGSP_BIC_AllHP",
+    "QGSP_BIC_HP",
+    "QGSP_BIC_HPT",
+    "QGSP_FTFP_BERT",
+    "QGSP_INCLXX",
+    "QGS_BIC",
+    "Shielding",
+    "ShieldingLEND"
+  ]
+}

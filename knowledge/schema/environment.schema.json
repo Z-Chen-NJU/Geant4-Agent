@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EnvironmentSpec",
+  "type": "object",
+  "properties": {
+    "atmosphere": {
+      "type": "string",
+      "description": "Label for the surrounding environment (e.g., air, vacuum, custom)"
+    },
+    "temperature_K": {
+      "type": "number",
+      "minimum": 0.0
+    },
+    "pressure_Pa": {
+      "type": "number",
+      "minimum": 0.0
+    },
+    "gas_mix": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "component": {"type": "string"},
+          "fraction": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+        },
+        "required": ["component", "fraction"],
+        "additionalProperties": false
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

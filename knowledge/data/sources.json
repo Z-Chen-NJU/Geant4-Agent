@@ -1,0 +1,16 @@
+{
+  "materials": {
+    "nist_material_names_url": "https://geant4.web.cern.ch/documentation/dev/bfad_html/ForApplicationDevelopers/Appendix/materialNames.html"
+  },
+  "physics_lists": {
+    "reference_lists_url": "https://geant4.web.cern.ch/documentation/dev/plg_html/PhysicsListGuide/reference_PL/index.html"
+  },
+  "particles": {
+    "particle_list_base_url": "https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/AllResources/TrackingAndPhysics/particleList.src"
+  },
+  "docs": [
+    "https://geant4.web.cern.ch/documentation/pipelines/master/bfad_html/ForApplicationDevelopers/Detector/material.html",
+    "https://geant4.web.cern.ch/documentation/dev/plg_html/PhysicsListGuide/physicslistguide.html",
+    "https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/AllResources/TrackingAndPhysics/particleList.src"
+  ]
+}

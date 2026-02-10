@@ -96,6 +96,14 @@ python infer.py --text "ring of 12 modules, radius 40 mm, module 8x10x2, clearan
 python end_to_end.py --text "ring of 12 modules, radius 40 mm, module 8x10x2, clearance 1 mm" --device cuda --top_k 3 --autofix --prompt_format json_schema
 ```
 
+## LLM Data Synthesis (Ollama)
+
+Generate JSONL samples using Ollama:
+
+```powershell
+python ollama_data.py --out bert_lab_ollama_samples.jsonl --n 50 --config bert_lab/ollama_config.json
+```
+
 ## Ollama API (Config Placeholder)
 
 If you want to route natural language through Ollama, edit:

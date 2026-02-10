@@ -1,0 +1,9 @@
+{
+  "source": "Project-maintained list (common output formats). Not an official Geant4 list.",
+  "items": [
+    "root",
+    "csv",
+    "ascii",
+    "json"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "temperature_K": {
+    "min": 0.0,
+    "max": 5000.0
+  },
+  "pressure_Pa": {
+    "min": 0.0,
+    "max": 1.0e9
+  },
+  "notes": "Project-level sanity bounds; not authoritative physics limits."
+}

@@ -1,0 +1,7 @@
+{
+  "energy_MeV": {
+    "min": 0.0,
+    "max": 1000000.0
+  },
+  "notes": "Project-level sanity bounds; not authoritative physics limits."
+}

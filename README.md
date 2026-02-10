@@ -1,23 +1,28 @@
-# Geant4-Agent
+﻿# Geant4-Agent
 
-A Geant4-oriented geometry assembly prototype: DSL + feasibility checker, plus a BERT lab for
-structure/parameter extraction.
+A Geant4-oriented geometry assembly prototype: DSL + feasibility checker, plus a BERT-based NLU lab and an LLM-assisted planner for multi-turn clarification.
 
 ## Repository Layout
 
-This repo is split into four layers:
+This repo is split into layered components:
 
-- `geometry/`: DSL + feasibility checker + experiments (Geant4-style assemblies)
-- `bert_lab/`: A small, isolated starting point for BERT-based parameter extraction
+- `builder/geometry/`: DSL + feasibility checker + experiments (Geant4-style assemblies)
+- `nlu/bert_lab/`: BERT-based NLU (structure + parameters + entities)
+- `planner/`: LLM-driven planning + clarification flows
 - `knowledge/`: Materials/environment knowledge (JSON schema + validation)
-- `llm/`: Ollama-driven prompt flows and JSON-schema constrained generation
+- `ui/web/`: Local web UI for multi-turn dialogue
+- `core/`: Shared schemas and semantic frame
 
 ## Architecture Overview
 
-- **Geometry core** (`geometry/`): DSL + analytical feasibility checks. Produces errors, warnings, and suggestions.
-- **Language core** (`bert_lab/`): Structure classification + parameter extraction + postprocess.
+- **Geometry core** (`builder/geometry/`): DSL + analytical feasibility checks. Produces errors, warnings, and suggestions.
+- **NLU core** (`nlu/bert_lab/`): Structure classification + parameter/entity extraction + postprocess.
+- **Planner layer** (`planner/`): LLM-driven question planning and schema-constrained outputs.
 - **Knowledge layer** (`knowledge/`): JSON schema, validated lists, and validation.
-- **LLM layer** (`llm/`): Prompt flows and schema-constrained outputs via Ollama.
+- **UI layer** (`ui/web/`): Local multi-turn interface.
+- **Core** (`core/`): Shared schema + semantic frame.
+
+See: `docs/ARCHITECTURE.md`
 
 ## Virtual Environment
 
@@ -29,19 +34,19 @@ python -m venv .venv
 ## Geometry Quick Start
 
 ```powershell
-python -m geometry.cli run_all --outdir geometry/out --n_samples 200 --n_param_sets 100 --seed 7 --dataset geometry/examples/coverage.csv
+python -m builder.geometry.cli run_all --outdir builder/geometry/out --n_samples 200 --n_param_sets 100 --seed 7 --dataset builder/geometry/examples/coverage.csv
 ```
 
 Expected outputs:
-- `geometry/out/coverage_summary.json`
-- `geometry/out/coverage_checked.jsonl`
-- `geometry/out/feasibility_summary.json`
-- `geometry/out/ambiguity_summary.json`
+- `builder/geometry/out/coverage_summary.json`
+- `builder/geometry/out/coverage_checked.jsonl`
+- `builder/geometry/out/feasibility_summary.json`
+- `builder/geometry/out/ambiguity_summary.json`
 
 ## BERT Lab Quick Start
 
 ```powershell
-python bert_lab/bert_lab_data.py --out bert_lab/bert_lab_samples.jsonl --n 200 --seed 7
+python nlu/bert_lab/bert_lab_data.py --out nlu/bert_lab/data/bert_lab_samples.jsonl --n 200 --seed 7
 ```
 
 ## Knowledge Quick Start
@@ -49,49 +54,54 @@ python bert_lab/bert_lab_data.py --out bert_lab/bert_lab_samples.jsonl --n 200 -
 Fetch Geant4 NIST material names (official list):
 
 ```powershell
-python knowledge\\tools\\fetch_geant4_materials.py
+python knowledge\tools\fetch_geant4_materials.py
 ```
 
 ## Local Web UI
 
 ```powershell
-python llm/web/server.py
+python ui/web/server.py
 ```
 
 Then open:
-
 - http://127.0.0.1:8088
 
 ## Current Limitations
 
 - **No full Geant4 runtime config**: schema exists, but no full generator of G4 macro or C++ config.
-- **Physics lists are reference-only**: fetched from official “reference” list, not a complete superset.
+- **Physics lists are reference-only**: fetched from official reference list, not a complete superset.
 - **Output formats are project-defined**: not an official Geant4 list.
 - **RAG not implemented**: `knowledge/rag/` is a placeholder; no retrieval index yet.
-- **Material ↔ volume mapping is manual**: needs explicit `volume_names` to validate mappings.
+- **Material → volume mapping is manual**: needs explicit `volume_names` to validate mappings.
 - **BERT data is synthetic-heavy**: real-world robustness still unverified.
 
 ---
 
 # Geant4-Agent（中文）
 
-面向 Geant4 的几何装配原型：包含 DSL 与可行性检查，以及用于结构/参数抽取的 BERT Lab。
+面向 Geant4 的几何装配原型：包含 DSL 与可行性检查，同时提供 BERT 语义解析与 LLM 规划的多轮对话能力。
 
 ## 仓库结构
 
-本仓库分为四层：
+仓库按分层组件组织：
 
-- `geometry/`: DSL + 理论可行性检查 + 实验
-- `bert_lab/`: BERT 结构/参数抽取实验区
-- `knowledge/`: 材料/环境知识层（JSON schema + 校验）
-- `llm/`: LLM 层（Ollama 驱动的 prompt 流程与 schema 约束）
+- `builder/geometry/`：DSL + 理论可行性检查 + 实验
+- `nlu/bert_lab/`：BERT 语义解析（结构/参数/实体）
+- `planner/`：LLM 规划与追问流程
+- `knowledge/`：材料/环境知识（JSON schema + 校验）
+- `ui/web/`：本地多轮对话界面
+- `core/`：共享 schema 与语义帧
 
 ## 架构概览
 
-- **几何核心**（`geometry/`）：DSL + 解析可行性判定，输出错误/警告/建议。
-- **语言核心**（`bert_lab/`）：结构分类 + 参数抽取 + 后处理。
+- **几何核心**（`builder/geometry/`）：DSL + 解析可行性判定，输出错误/警告/建议。
+- **语义核心**（`nlu/bert_lab/`）：结构分类 + 参数/实体抽取 + 后处理。
+- **规划层**（`planner/`）：LLM 驱动的追问与 schema 约束输出。
 - **知识层**（`knowledge/`）：JSON schema、可溯源列表与校验。
-- **LLM 层**（`llm/`）：Ollama prompt 流程与 schema 约束输出。
+- **UI 层**（`ui/web/`）：本地多轮对话界面。
+- **Core**（`core/`）：共享 schema 与语义帧。
+
+详见：`docs/ARCHITECTURE.md`
 
 ## 虚拟环境
 
@@ -103,44 +113,43 @@ python -m venv .venv
 ## 几何快速开始
 
 ```powershell
-python -m geometry.cli run_all --outdir geometry/out --n_samples 200 --n_param_sets 100 --seed 7 --dataset geometry/examples/coverage.csv
+python -m builder.geometry.cli run_all --outdir builder/geometry/out --n_samples 200 --n_param_sets 100 --seed 7 --dataset builder/geometry/examples/coverage.csv
 ```
 
 预期输出：
-- `geometry/out/coverage_summary.json`
-- `geometry/out/coverage_checked.jsonl`
-- `geometry/out/feasibility_summary.json`
-- `geometry/out/ambiguity_summary.json`
+- `builder/geometry/out/coverage_summary.json`
+- `builder/geometry/out/coverage_checked.jsonl`
+- `builder/geometry/out/feasibility_summary.json`
+- `builder/geometry/out/ambiguity_summary.json`
 
 ## BERT 快速开始
 
 ```powershell
-python bert_lab/bert_lab_data.py --out bert_lab/bert_lab_samples.jsonl --n 200 --seed 7
+python nlu/bert_lab/bert_lab_data.py --out nlu/bert_lab/data/bert_lab_samples.jsonl --n 200 --seed 7
 ```
 
 ## 知识层快速开始
 
-抓取官方材料名单：
+抓取 Geant4 NIST 材料名（官方列表）：
 
 ```powershell
-python knowledge\\tools\\fetch_geant4_materials.py
+python knowledge\tools\fetch_geant4_materials.py
 ```
 
 ## 本地 Web 界面
 
 ```powershell
-python llm/web/server.py
+python ui/web/server.py
 ```
 
 然后访问：
-
 - http://127.0.0.1:8088
 
 ## 当前限制
 
-- **尚无完整 Geant4 运行配置**：目前只有 schema，没有 G4 宏或 C++ 配置生成。
-- **物理列表仅覆盖 reference 列表**：非完整集合。
+- **尚无完整 Geant4 运行配置**：只有 schema，没有完整的 G4 宏或 C++ 生成器。
+- **物理过程列表仅覆盖 reference**：非完整集合。
 - **输出格式为项目定义**：非官方 Geant4 列表。
-- **RAG 尚未实现**：`knowledge/rag/` 仅为占位目录。
-- **材料与体积映射需手工指定**：需要 `volume_names` 才能验证映射。
+- **RAG 尚未实现**：`knowledge/rag/` 为占位。
+- **材料 → 体积映射需手工指定**：需要 `volume_names` 才能验证。
 - **BERT 数据以合成为主**：真实输入鲁棒性待验证。

@@ -1,0 +1,231 @@
+:root {
+  --ink: #1b1c1f;
+  --muted: #5b6470;
+  --surface: #f7f4ef;
+  --accent: #0b6b6f;
+  --accent-2: #cc6b2c;
+  --ring: rgba(11, 107, 111, 0.25);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Palatino Linotype", "Book Antiqua", "Garamond", serif;
+  color: var(--ink);
+  background: #f0ece6;
+}
+
+.bg {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(700px 400px at 15% 10%, rgba(204, 107, 44, 0.18), transparent 60%),
+    radial-gradient(600px 380px at 80% 0%, rgba(11, 107, 111, 0.2), transparent 65%),
+    linear-gradient(120deg, #f3efe8 0%, #f8f6f2 60%, #f0ebe3 100%);
+  z-index: -1;
+}
+
+.shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 48px 20px 64px;
+  animation: fadeIn 600ms ease-out;
+}
+
+.hero {
+  margin-bottom: 28px;
+  animation: rise 600ms ease-out;
+}
+
+.badge {
+  display: inline-block;
+  padding: 6px 12px;
+  background: rgba(11, 107, 111, 0.12);
+  border: 1px solid rgba(11, 107, 111, 0.3);
+  border-radius: 999px;
+  font-size: 13px;
+  letter-spacing: 0.4px;
+  color: var(--accent);
+}
+
+h1 {
+  font-size: 42px;
+  margin: 12px 0 6px;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 18px;
+  max-width: 640px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  padding: 20px 22px;
+  margin: 18px 0;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.05);
+  animation: rise 600ms ease-out;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 22px;
+}
+
+h3 {
+  margin: 6px 0 8px;
+  font-size: 17px;
+}
+
+.field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.field span {
+  display: block;
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  background: #fffdf9;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toggle input {
+  width: auto;
+  accent-color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+button {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-family: inherit;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+}
+
+button.ghost {
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  color: var(--ink);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+pre {
+  background: #111315;
+  color: #f1f1f1;
+  padding: 12px;
+  border-radius: 12px;
+  overflow: auto;
+  min-height: 140px;
+  font-size: 12px;
+}
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 180px;
+  max-height: 360px;
+  overflow: auto;
+  background: #fffdf9;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.msg {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.msg.user {
+  align-self: flex-end;
+  background: rgba(11, 107, 111, 0.15);
+  border: 1px solid rgba(11, 107, 111, 0.25);
+}
+
+.msg.assistant {
+  align-self: flex-start;
+  background: rgba(204, 107, 44, 0.15);
+  border: 1px solid rgba(204, 107, 44, 0.25);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.footer {
+  text-align: center;
+  color: var(--muted);
+  margin-top: 24px;
+  font-size: 13px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rise {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@media (max-width: 720px) {
+  h1 { font-size: 32px; }
+  .shell { padding: 32px 16px 40px; }
+}

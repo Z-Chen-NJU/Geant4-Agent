@@ -1,8 +1,0 @@
-{
-  "base_url": "http://localhost:11434",
-  "model": "qwen2.5:7b-instruct",
-  "timeout_s": 60,
-  "headers": {
-    "Content-Type": "application/json"
-  }
-}

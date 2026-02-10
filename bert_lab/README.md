@@ -146,3 +146,149 @@ PY
 ## Notes
 - This is a minimal training skeleton meant for research iteration.
 - Parameter extraction is modeled via a simple token classifier.
+
+---
+
+# BERT Lab（中文）
+
+该目录用于训练编码器模型以从自然语言中识别结构与参数，主要使用
+`bert_lab_data.py` 生成的合成 JSONL 数据。
+
+## 依赖
+- Python >= 3.10
+- PyTorch（建议 GPU）
+- Transformers（HuggingFace）
+
+## 快速开始
+
+生成合成数据：
+
+```powershell
+python bert_lab_data.py --out bert_lab_samples.jsonl --n 2000 --seed 7 --noise_level none --unknown_rate 0.15
+```
+
+训练结构分类器：
+
+```powershell
+python train_structure.py --data bert_lab_samples.jsonl --outdir bert_model --model distilbert-base-uncased --epochs 3
+```
+
+## 结构流程图
+```
+   +--------------------+
+   | Natural Language   |
+   +----------+---------+
+              |
+              v
+     +--------+--------+
+     | train_structure |
+     |  (classifier)   |
+     +--------+--------+
+              |
+              v
+       +------+------+
+       | infer.py    |
+       | structure   |
+       +------+------+
+              |
+              v
+       +------+------+
+       | train_ner   |
+       | (token cls) |
+       +------+------+
+              |
+              v
+       +------+------+
+       | infer.py    |
+       | params      |
+       +------+------+
+              |
+              v
+       +------+------+
+       | postprocess |
+       | fill/clean  |
+       +------+------+
+              |
+              v
+       +------+------+
+       | end_to_end  |
+       | -> geometry |
+       +-------------+
+```
+
+## 参数抽取（NER）
+
+生成带 span 的数据：
+
+```powershell
+python bert_lab_data.py --out bert_lab_ner_samples.jsonl --n 2000 --seed 7 --with_spans --noise_level none
+```
+
+训练 token 分类器：
+
+```powershell
+python train_ner.py --data bert_lab_ner_samples.jsonl --outdir bert_ner_model --model distilbert-base-uncased --epochs 3
+```
+
+## 推理
+
+从文本推理结构与参数：
+
+```powershell
+python infer.py --text "ring of 12 modules, radius 40 mm, module 8x10x2, clearance 1 mm" --device cuda
+```
+
+## 端到端示例
+
+```powershell
+python end_to_end.py --text "ring of 12 modules, radius 40 mm, module 8x10x2, clearance 1 mm" --device cuda --top_k 3 --autofix --prompt_format json_schema
+```
+
+## LLM 合成数据（Ollama）
+
+通过 Ollama 生成 JSONL 样本：
+
+```powershell
+python ollama_data.py --out bert_lab_ollama_samples.jsonl --n 50 --config bert_lab/ollama_config.json
+```
+
+## Ollama API（配置）
+
+如需调用 Ollama，编辑：
+- `bert_lab/ollama_config.json`
+
+最小示例：
+
+```powershell
+python - << 'PY'
+from bert_lab.ollama_client import chat
+resp = chat("Describe a ring of 12 modules with radius 40 mm.")
+print(resp.get("response", "")[:200])
+PY
+```
+
+## 测试输入
+
+参考 `test_inputs.jsonl`。
+
+## 可选：安装 GPU 版本 PyTorch
+
+```powershell
+.\.venv\Scripts\python -m pip uninstall -y torch
+.\.venv\Scripts\python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+```
+
+验证 GPU：
+
+```powershell
+.\.venv\Scripts\python - << 'PY'
+import torch
+print(torch.__version__)
+print('cuda available:', torch.cuda.is_available())
+print('device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else None)
+PY
+```
+
+## 备注
+- 这是一个用于研究迭代的最小训练骨架。
+- 参数抽取采用 token 分类模型。

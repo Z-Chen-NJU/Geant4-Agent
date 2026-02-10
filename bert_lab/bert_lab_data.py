@@ -300,7 +300,29 @@ def _text_shell(
     return _add_noise(rng, text, spans, noise_level)
 
 
-def generate_samples(n: int, seed: int, with_spans: bool, noise_level: str) -> List[Dict[str, object]]:
+def _text_unknown(rng: random.Random, noise_level: str) -> str:
+    variants = [
+        "Set up a prototype with some modules; exact arrangement can be decided later",
+        "Arrange several components with standard clearances; details are flexible",
+        "Prepare a module layout with typical spacing; choose a reasonable pattern",
+    ]
+    prefix = rng.choice(variants)
+    parts = [
+        f"module size {_maybe_unit(rng, rng.uniform(3.0, 12.0))} by {_maybe_unit(rng, rng.uniform(3.0, 12.0))} by {_maybe_unit(rng, rng.uniform(1.0, 5.0))}",
+        f"clearance {_maybe_unit(rng, rng.uniform(0.1, 1.0))}",
+    ]
+    text = prefix + ": " + _shuffle_phrases(rng, parts, noise_level) + "."
+    out, _ = _add_noise(rng, text, None, noise_level)
+    return out
+
+
+def generate_samples(
+    n: int,
+    seed: int,
+    with_spans: bool,
+    noise_level: str,
+    unknown_rate: float,
+) -> List[Dict[str, object]]:
     rng = random.Random(seed)
     samples: List[Dict[str, object]] = []
     generators = [
@@ -312,7 +334,11 @@ def generate_samples(n: int, seed: int, with_spans: bool, noise_level: str) -> L
     ]
 
     for i in range(n):
-        structure, sampler, renderer = generators[i % len(generators)]
+        if (not with_spans) and rng.random() < unknown_rate:
+            text = _text_unknown(rng, noise_level)
+            samples.append({"text": text, "structure": "unknown", "params": {}})
+            continue
+        structure, sampler, renderer = rng.choice(generators)
         params = sampler(rng)
         text, spans = renderer(rng, params, with_spans, noise_level)
         sample = {"text": text, "structure": structure, "params": params}
@@ -335,9 +361,16 @@ def main() -> None:
         choices=["none", "light", "full"],
         help="Text noise level (default: none)",
     )
+    parser.add_argument(
+        "--unknown_rate",
+        type=float,
+        default=0.15,
+        help="Fraction of unknown-structure samples (classification only)",
+    )
     args = parser.parse_args()
 
-    samples = generate_samples(args.n, args.seed, args.with_spans, args.noise_level)
+    unknown_rate = 0.0 if args.with_spans else max(0.0, min(1.0, args.unknown_rate))
+    samples = generate_samples(args.n, args.seed, args.with_spans, args.noise_level, unknown_rate)
     with open(args.out, "w") as f:
         for s in samples:
             f.write(json.dumps(s) + "\n")

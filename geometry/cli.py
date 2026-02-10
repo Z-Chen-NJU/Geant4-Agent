@@ -36,6 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_syn.add_argument("--input", required=True, help="Input JSON with structure + params")
     p_syn.add_argument("--outdir", default="out")
     p_syn.add_argument("--seed", type=int, default=42)
+    p_syn.add_argument("--autofix", action="store_true", help="Apply conservative parameter fixes")
 
     return parser
 
@@ -57,7 +58,7 @@ def main() -> None:
     elif args.command == "synthesize":
         from .synthesize import run_synthesize
 
-        run_synthesize(args.input, args.outdir, args.seed)
+        run_synthesize(args.input, args.outdir, args.seed, args.autofix)
     else:
         parser.error("Unknown command")
 

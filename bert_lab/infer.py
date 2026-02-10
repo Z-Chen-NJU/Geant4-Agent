@@ -37,7 +37,7 @@ def predict_structure(
     model_dir: str,
     device: str = "auto",
     min_confidence: float = 0.6,
-) -> Tuple[str, Dict[str, float]]:
+) -> Tuple[str, Dict[str, float], List[Tuple[str, float]]]:
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
     model = AutoModelForSequenceClassification.from_pretrained(model_dir)
 
@@ -63,7 +63,8 @@ def predict_structure(
         best_label = "unknown"
     scores = {id2label[i]: float(p) for i, p in enumerate(probs)}
     scores["best_prob"] = best_prob
-    return best_label, scores
+    ranked = sorted(((id2label[i], float(p)) for i, p in enumerate(probs)), key=lambda x: x[1], reverse=True)
+    return best_label, scores, ranked
 
 
 def extract_params(text: str, model_dir: str, device: str = "auto") -> Dict[str, float]:
@@ -156,13 +157,24 @@ def main() -> None:
     parser.add_argument("--ner_model", default="bert_lab/bert_ner_model")
     parser.add_argument("--device", default="auto", choices=["auto", "cuda", "cpu"])
     parser.add_argument("--min_confidence", type=float, default=0.6)
+    parser.add_argument("--top_k", type=int, default=1)
     args = parser.parse_args()
 
-    structure, scores = predict_structure(args.text, args.structure_model, args.device, args.min_confidence)
+    structure, scores, ranked = predict_structure(
+        args.text, args.structure_model, args.device, args.min_confidence
+    )
     params = extract_params(args.text, args.ner_model, args.device)
     params, notes = merge_params(args.text, params)
 
-    print(json.dumps({"structure": structure, "scores": scores, "params": params, "notes": notes}, indent=2))
+    top_k = max(1, args.top_k)
+    candidates = [{"structure": name, "prob": prob} for name, prob in ranked[:top_k]]
+
+    print(
+        json.dumps(
+            {"structure": structure, "scores": scores, "candidates": candidates, "params": params, "notes": notes},
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

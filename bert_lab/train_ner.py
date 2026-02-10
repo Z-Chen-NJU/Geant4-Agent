@@ -137,7 +137,58 @@ def compute_metrics(eval_pred):
     correct = (preds[mask] == labels[mask]).sum().item()
     total = mask.sum().item()
     acc = correct / total if total else 0.0
-    return {"token_accuracy": acc}
+    # Span-level metrics (micro)
+    def _spans(seq, id_to_label):
+        spans = []
+        cur_key = None
+        cur_start = None
+        for i, lab_id in enumerate(seq):
+            lab = id_to_label[int(lab_id)]
+            if lab == "O":
+                if cur_key is not None:
+                    spans.append((cur_key, cur_start, i))
+                    cur_key = None
+                    cur_start = None
+                continue
+            if lab.startswith("B-"):
+                if cur_key is not None:
+                    spans.append((cur_key, cur_start, i))
+                cur_key = lab[2:]
+                cur_start = i
+            elif lab.startswith("I-"):
+                key = lab[2:]
+                if cur_key != key:
+                    if cur_key is not None:
+                    spans.append((cur_key, cur_start, i))
+                    cur_key = key
+                    cur_start = i
+        if cur_key is not None:
+            spans.append((cur_key, cur_start, len(seq)))
+        return spans
+
+    labels_np = labels
+    preds_np = preds
+    true_spans = []
+    pred_spans = []
+    for s_idx, (y_true, y_pred, m) in enumerate(zip(labels_np, preds_np, mask)):
+        idx = m.nonzero()[0]
+        if len(idx) == 0:
+            continue
+        y_true_seq = [y_true[i] for i in idx]
+        y_pred_seq = [y_pred[i] for i in idx]
+        true_spans.extend([(s_idx, *sp) for sp in _spans(y_true_seq, ID_TO_LABEL)])
+        pred_spans.extend([(s_idx, *sp) for sp in _spans(y_pred_seq, ID_TO_LABEL)])
+
+    true_set = set(true_spans)
+    pred_set = set(pred_spans)
+    tp = len(true_set & pred_set)
+    fp = len(pred_set - true_set)
+    fn = len(true_set - pred_set)
+    precision = tp / (tp + fp) if (tp + fp) else 0.0
+    recall = tp / (tp + fn) if (tp + fn) else 0.0
+    f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+
+    return {"token_accuracy": acc, "span_precision": precision, "span_recall": recall, "span_f1": f1}
 
 
 def main() -> None:

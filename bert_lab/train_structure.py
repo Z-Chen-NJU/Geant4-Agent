@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
@@ -11,7 +12,7 @@ from torch.utils.data import Dataset
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, Trainer, TrainingArguments
 
 
-LABELS = ["nest", "grid", "ring", "stack", "shell"]
+LABELS = ["nest", "grid", "ring", "stack", "shell", "unknown"]
 LABEL_TO_ID = {name: i for i, name in enumerate(LABELS)}
 
 
@@ -62,11 +63,21 @@ def _load_samples(path: str) -> List[Sample]:
 def _train_eval_split(samples: List[Sample], eval_split: float, seed: int) -> Tuple[List[Sample], List[Sample]]:
     if eval_split <= 0:
         return samples, []
-    rng = torch.Generator().manual_seed(seed)
-    indices = torch.randperm(len(samples), generator=rng).tolist()
-    split = max(1, int(len(samples) * (1.0 - eval_split)))
-    train_idx = indices[:split]
-    eval_idx = indices[split:]
+    rng = random.Random(seed)
+    by_label: Dict[int, List[int]] = {}
+    for i, s in enumerate(samples):
+        by_label.setdefault(s.label, []).append(i)
+    train_idx: List[int] = []
+    eval_idx: List[int] = []
+    for _, idxs in by_label.items():
+        rng.shuffle(idxs)
+        n_total = len(idxs)
+        n_eval = max(1, int(round(n_total * eval_split))) if n_total > 1 else 0
+        n_train = n_total - n_eval
+        train_idx.extend(idxs[:n_train])
+        eval_idx.extend(idxs[n_train:])
+    rng.shuffle(train_idx)
+    rng.shuffle(eval_idx)
     train_samples = [samples[i] for i in train_idx]
     eval_samples = [samples[i] for i in eval_idx]
     return train_samples, eval_samples

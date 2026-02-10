@@ -14,7 +14,7 @@ structure types from natural language. It uses the synthetic JSONL data generate
 Generate synthetic data:
 
 ```powershell
-python bert_lab_data.py --out bert_lab_samples.jsonl --n 2000 --seed 7 --noise_level none
+python bert_lab_data.py --out bert_lab_samples.jsonl --n 2000 --seed 7 --noise_level none --unknown_rate 0.15
 ```
 
 Train a structure classifier:
@@ -93,7 +93,22 @@ python infer.py --text "ring of 12 modules, radius 40 mm, module 8x10x2, clearan
 ## End-to-End Demo
 
 ```powershell
-python end_to_end.py --text "ring of 12 modules, radius 40 mm, module 8x10x2, clearance 1 mm" --device cuda
+python end_to_end.py --text "ring of 12 modules, radius 40 mm, module 8x10x2, clearance 1 mm" --device cuda --top_k 3 --autofix --prompt_format json_schema
+```
+
+## Ollama API (Config Placeholder)
+
+If you want to route natural language through Ollama, edit:
+- `bert_lab/ollama_config.json`
+
+Minimal usage example:
+
+```powershell
+python - << 'PY'
+from bert_lab.ollama_client import chat
+resp = chat("Describe a ring of 12 modules with radius 40 mm.")
+print(resp.get("response", "")[:200])
+PY
 ```
 
 ## Test Inputs

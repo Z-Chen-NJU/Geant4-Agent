@@ -145,6 +145,9 @@ def _sanitize_structure_hint(hint: Any) -> str:
         "shell",
         "single_box",
         "single_tubs",
+        "single_sphere",
+        "single_cons",
+        "single_trd",
         "unknown",
     }
     return val if val in allowed else ""

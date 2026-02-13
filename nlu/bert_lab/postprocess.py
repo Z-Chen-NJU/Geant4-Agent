@@ -79,6 +79,12 @@ def _fill_by_patterns(text: str, out: Dict[str, float], notes: List[str]) -> Non
         ("parent_z", rf"(?:parent[_\s-]*z)\s*[:=]\s*([\d\.]+\s*{unit})"),
         ("child_rmax", rf"(?:child[_\s-]*rmax|rmax)\s*[:=]\s*([\d\.]+\s*{unit})"),
         ("child_hz", rf"(?:child[_\s-]*hz|hz)\s*[:=]\s*([\d\.]+\s*{unit})"),
+        ("rmax1", rf"(?:rmax1)\s*[:=]\s*([\d\.]+\s*{unit})"),
+        ("rmax2", rf"(?:rmax2)\s*[:=]\s*([\d\.]+\s*{unit})"),
+        ("x1", rf"(?:x1)\s*[:=]\s*([\d\.]+\s*{unit})"),
+        ("x2", rf"(?:x2)\s*[:=]\s*([\d\.]+\s*{unit})"),
+        ("y1", rf"(?:y1)\s*[:=]\s*([\d\.]+\s*{unit})"),
+        ("y2", rf"(?:y2)\s*[:=]\s*([\d\.]+\s*{unit})"),
         ("stack_x", rf"(?:stack[_\s-]*x)\s*[:=]\s*([\d\.]+\s*{unit})"),
         ("stack_y", rf"(?:stack[_\s-]*y)\s*[:=]\s*([\d\.]+\s*{unit})"),
         ("t1", rf"\bt1\s*[:=]\s*([\d\.]+\s*{unit})"),
@@ -90,6 +96,12 @@ def _fill_by_patterns(text: str, out: Dict[str, float], notes: List[str]) -> Non
         ("th1", rf"\bth1\s*[:=]\s*([\d\.]+\s*{unit})"),
         ("th2", rf"\bth2\s*[:=]\s*([\d\.]+\s*{unit})"),
         ("th3", rf"\bth3\s*[:=]\s*([\d\.]+\s*{unit})"),
+        ("tx", rf"(?:tx)\s*[:=]\s*([\d\.]+\s*{unit})"),
+        ("ty", rf"(?:ty)\s*[:=]\s*([\d\.]+\s*{unit})"),
+        ("tz", rf"(?:tz)\s*[:=]\s*([\d\.]+\s*{unit})"),
+        ("rx", rf"(?:rx)\s*[:=]\s*([\d\.]+)"),
+        ("ry", rf"(?:ry)\s*[:=]\s*([\d\.]+)"),
+        ("rz", rf"(?:rz)\s*[:=]\s*([\d\.]+)"),
     ]:
         if key in out:
             continue

@@ -12,7 +12,18 @@ from nlu.bert_lab.data_multitask import generate_samples as generate_multitask_s
 
 
 STRUCTURE_LABELS = ["nest", "grid", "ring", "stack", "shell"]
-MULTITASK_LABELS = ["nest", "grid", "ring", "stack", "shell", "single_box", "single_tubs"]
+MULTITASK_LABELS = [
+    "nest",
+    "grid",
+    "ring",
+    "stack",
+    "shell",
+    "single_box",
+    "single_tubs",
+    "single_sphere",
+    "single_cons",
+    "single_trd",
+]
 ALL_LABELS = STRUCTURE_LABELS + ["unknown"]
 MATERIAL_POOL = ["G4_Si", "G4_Cu", "G4_Al", "G4_WATER", "G4_AIR"]
 PARTICLE_POOL = ["gamma", "e-", "proton", "neutron"]

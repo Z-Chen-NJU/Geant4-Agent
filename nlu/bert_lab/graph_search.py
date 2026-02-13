@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import math
 import re
@@ -24,16 +24,19 @@ SKELETON_SUMMARY: Dict[str, str] = {
 }
 
 KEYWORD_CUES: Dict[str, Tuple[str, ...]] = {
-    "ring": ("ring", "circular", "annulus", "circle", "radius", "环", "圆环", "环形"),
-    "grid": ("grid", "array", "matrix", "pitch", "nx", "ny", "阵列", "网格", "矩阵"),
-    "nest": ("nest", "inside", "contains", "contain", "inner", "outer", "内嵌", "包含", "包裹"),
-    "stack": ("stack", "layer", "layers", "along z", "叠层", "分层"),
-    "shell": ("shell", "concentric", "thickness", "coaxial", "壳", "同心"),
-    "single_box": ("single_box", "box", "cube", "cuboid", "立方体", "长方体"),
-    "single_tubs": ("single_tubs", "tubs", "cylinder", "tube", "圆柱"),
+    "ring": ("ring", "circular", "annulus", "circle", "radius"),
+    "grid": ("grid", "array", "matrix", "pitch", "nx", "ny"),
+    "nest": ("nest", "inside", "contains", "contain", "inner", "outer"),
+    "stack": ("stack", "layer", "layers", "along z"),
+    "shell": ("shell", "concentric", "thickness", "coaxial"),
+    "single_box": ("single_box", "box", "cube", "cuboid"),
+    "single_tubs": ("single_tubs", "tubs", "cylinder", "tube"),
+    "single_sphere": ("single_sphere", "sphere", "ball"),
+    "single_cons": ("single_cons", "cons", "cone", "frustum"),
+    "single_trd": ("single_trd", "trd", "trapezoid", "trapezoidal"),
 }
 
-AMBIGUITY_CUES = ("ambiguous", "undecided", "unresolved", "not fixed", "不确定", "未定", "模糊")
+AMBIGUITY_CUES = ("ambiguous", "undecided", "unresolved", "not fixed")
 
 
 @dataclass(frozen=True)
@@ -79,7 +82,7 @@ def _cue_score(text: str, structure: str) -> float:
 
 def _explicit_structure_hint(text: str) -> str:
     m = re.search(
-        r"(?:^|[;\s])structure\s*[:=]\s*(ring|grid|nest|stack|shell|single_box|single_tubs)\b",
+        r"(?:^|[;\s])structure\s*[:=]\s*(ring|grid|nest|stack|shell|single_box|single_tubs|single_sphere|single_cons|single_trd)\b",
         text,
         flags=re.IGNORECASE,
     )
@@ -154,7 +157,18 @@ def search_candidate_graphs(
         notes.append(f"explicit_structure_hint:{explicit_hint}")
 
     structures = [s.name for s in SKELETONS]
-    core_skeletons = {"nest_box_tubs", "grid_modules", "ring_modules", "stack_in_box", "shell_nested", "single_box", "single_tubs"}
+    core_skeletons = {
+        "nest_box_tubs",
+        "grid_modules",
+        "ring_modules",
+        "stack_in_box",
+        "shell_nested",
+        "single_box",
+        "single_tubs",
+        "single_sphere",
+        "single_cons",
+        "single_trd",
+    }
     scored_candidates: List[CandidateGraph] = []
     raw_scores_by_summary: Dict[str, float] = {}
     for structure in structures:

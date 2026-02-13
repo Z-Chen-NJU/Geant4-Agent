@@ -210,7 +210,7 @@ def _generate_llm_samples(n: int, ollama_config: str) -> List[Sample]:
     prompt = (
         "Generate a single JSON object for a detector request.\n"
         "Return JSON with keys: text, structure.\n"
-        "Structure must be one of: nest, grid, ring, stack, shell, single_box, single_tubs, unknown.\n"
+        "Structure must be one of: nest, grid, ring, stack, shell, single_box, single_tubs, single_sphere, single_cons, single_trd, unknown.\n"
         "The text should be a short natural-language request containing geometry hints.\n"
         "JSON:"
     )

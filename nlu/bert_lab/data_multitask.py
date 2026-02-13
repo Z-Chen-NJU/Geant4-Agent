@@ -13,6 +13,9 @@ from builder.geometry.library import (
     sample_shell_nested,
     sample_stack_in_box,
     sample_single_box,
+    sample_single_cons,
+    sample_single_sphere,
+    sample_single_trd,
     sample_single_tubs,
 )
 
@@ -35,6 +38,12 @@ PARAM_KEYS = [
     "parent_z",
     "child_rmax",
     "child_hz",
+    "rmax1",
+    "rmax2",
+    "x1",
+    "x2",
+    "y1",
+    "y2",
     "inner_r",
     "th1",
     "th2",
@@ -146,6 +155,42 @@ def _text_single_tubs(rng: random.Random, p: Dict[str, float]) -> Tuple[str, Lis
     text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
     return "Single cylinder: " + text + ".", [
         {"key": sp["key"], "start": sp["start"] + 16, "end": sp["end"] + 16} for sp in spans
+    ]
+
+
+def _text_single_sphere(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
+    parts = [
+        _part_with_span("child_rmax", _maybe_unit(rng, p["child_rmax"]), "rmax {value}"),
+    ]
+    text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
+    return "Single sphere: " + text + ".", [
+        {"key": sp["key"], "start": sp["start"] + 15, "end": sp["end"] + 15} for sp in spans
+    ]
+
+
+def _text_single_cons(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
+    parts = [
+        _part_with_span("rmax1", _maybe_unit(rng, p["rmax1"]), "rmax1 {value}"),
+        _part_with_span("rmax2", _maybe_unit(rng, p["rmax2"]), "rmax2 {value}"),
+        _part_with_span("child_hz", _maybe_unit(rng, p["child_hz"]), "hz {value}"),
+    ]
+    text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
+    return "Single frustum: " + text + ".", [
+        {"key": sp["key"], "start": sp["start"] + 16, "end": sp["end"] + 16} for sp in spans
+    ]
+
+
+def _text_single_trd(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
+    parts = [
+        _part_with_span("x1", _maybe_unit(rng, p["x1"]), "x1 {value}"),
+        _part_with_span("x2", _maybe_unit(rng, p["x2"]), "x2 {value}"),
+        _part_with_span("y1", _maybe_unit(rng, p["y1"]), "y1 {value}"),
+        _part_with_span("y2", _maybe_unit(rng, p["y2"]), "y2 {value}"),
+        _part_with_span("module_z", _maybe_unit(rng, p["module_z"]), "z {value}"),
+    ]
+    text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
+    return "Single trd: " + text + ".", [
+        {"key": sp["key"], "start": sp["start"] + 12, "end": sp["end"] + 12} for sp in spans
     ]
 
 
@@ -274,6 +319,9 @@ def generate_samples(n: int, seed: int) -> List[Dict[str, object]]:
         ("shell", sample_shell_nested, _text_shell),
         ("single_box", sample_single_box, _text_single_box),
         ("single_tubs", sample_single_tubs, _text_single_tubs),
+        ("single_sphere", sample_single_sphere, _text_single_sphere),
+        ("single_cons", sample_single_cons, _text_single_cons),
+        ("single_trd", sample_single_trd, _text_single_trd),
     ]
 
     samples: List[Dict[str, object]] = []

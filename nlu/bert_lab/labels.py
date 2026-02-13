@@ -16,6 +16,12 @@ PARAM_KEYS = [
     "parent_z",
     "child_rmax",
     "child_hz",
+    "rmax1",
+    "rmax2",
+    "x1",
+    "x2",
+    "y1",
+    "y2",
     "inner_r",
     "th1",
     "th2",
@@ -28,6 +34,12 @@ PARAM_KEYS = [
     "t3",
     "stack_clearance",
     "nest_clearance",
+    "tx",
+    "ty",
+    "tz",
+    "rx",
+    "ry",
+    "rz",
 ]
 
 ENTITY_KEYS = [
@@ -46,6 +58,9 @@ STRUCTURE_LABELS = [
     "shell",
     "single_box",
     "single_tubs",
+    "single_sphere",
+    "single_cons",
+    "single_trd",
     "unknown",
 ]
 

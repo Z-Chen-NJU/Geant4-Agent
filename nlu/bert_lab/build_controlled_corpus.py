@@ -23,6 +23,9 @@ MULTITASK_LABELS = [
     "single_sphere",
     "single_cons",
     "single_trd",
+    "single_polycone",
+    "single_cuttubs",
+    "boolean",
 ]
 ALL_LABELS = STRUCTURE_LABELS + ["unknown"]
 MATERIAL_POOL = ["G4_Si", "G4_Cu", "G4_Al", "G4_WATER", "G4_AIR"]

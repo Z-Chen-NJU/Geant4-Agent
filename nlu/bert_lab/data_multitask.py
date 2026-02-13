@@ -7,8 +7,11 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 from builder.geometry.library import (
+    sample_boolean_boxes,
+    sample_single_cuttubs,
     sample_grid_modules,
     sample_nest_box_tubs,
+    sample_single_polycone,
     sample_ring_modules,
     sample_shell_nested,
     sample_stack_in_box,
@@ -44,6 +47,20 @@ PARAM_KEYS = [
     "x2",
     "y1",
     "y2",
+    "z1",
+    "z2",
+    "z3",
+    "r1",
+    "r2",
+    "r3",
+    "tilt_x",
+    "tilt_y",
+    "bool_a_x",
+    "bool_a_y",
+    "bool_a_z",
+    "bool_b_x",
+    "bool_b_y",
+    "bool_b_z",
     "inner_r",
     "th1",
     "th2",
@@ -194,6 +211,52 @@ def _text_single_trd(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List
     ]
 
 
+def _text_single_polycone(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
+    prefix = "Single polycone: "
+    parts = [
+        _part_with_span("z1", _maybe_unit(rng, p["z1"]), "z1 {value}"),
+        _part_with_span("z2", _maybe_unit(rng, p["z2"]), "z2 {value}"),
+        _part_with_span("z3", _maybe_unit(rng, p["z3"]), "z3 {value}"),
+        _part_with_span("r1", _maybe_unit(rng, p["r1"]), "r1 {value}"),
+        _part_with_span("r2", _maybe_unit(rng, p["r2"]), "r2 {value}"),
+        _part_with_span("r3", _maybe_unit(rng, p["r3"]), "r3 {value}"),
+    ]
+    text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
+    return prefix + text + ".", [
+        {"key": sp["key"], "start": sp["start"] + len(prefix), "end": sp["end"] + len(prefix)} for sp in spans
+    ]
+
+
+def _text_single_cuttubs(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
+    prefix = "Single cuttubs: "
+    parts = [
+        _part_with_span("child_rmax", _maybe_unit(rng, p["child_rmax"]), "rmax {value}"),
+        _part_with_span("child_hz", _maybe_unit(rng, p["child_hz"]), "hz {value}"),
+        _part_with_span("tilt_x", _fmt_num(p["tilt_x"]), "tilt_x {value}"),
+        _part_with_span("tilt_y", _fmt_num(p["tilt_y"]), "tilt_y {value}"),
+    ]
+    text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
+    return prefix + text + ".", [
+        {"key": sp["key"], "start": sp["start"] + len(prefix), "end": sp["end"] + len(prefix)} for sp in spans
+    ]
+
+
+def _text_boolean(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
+    prefix = "Boolean solid (union placeholder): "
+    parts = [
+        _part_with_span("bool_a_x", _maybe_unit(rng, p["bool_a_x"]), "a.x {value}"),
+        _part_with_span("bool_a_y", _maybe_unit(rng, p["bool_a_y"]), "a.y {value}"),
+        _part_with_span("bool_a_z", _maybe_unit(rng, p["bool_a_z"]), "a.z {value}"),
+        _part_with_span("bool_b_x", _maybe_unit(rng, p["bool_b_x"]), "b.x {value}"),
+        _part_with_span("bool_b_y", _maybe_unit(rng, p["bool_b_y"]), "b.y {value}"),
+        _part_with_span("bool_b_z", _maybe_unit(rng, p["bool_b_z"]), "b.z {value}"),
+    ]
+    text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
+    return prefix + text + ".", [
+        {"key": sp["key"], "start": sp["start"] + len(prefix), "end": sp["end"] + len(prefix)} for sp in spans
+    ]
+
+
 def _text_ring(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
     parts = [
         _part_with_span("module_x", _maybe_unit(rng, p["module_x"]), "module x {value}"),
@@ -322,6 +385,9 @@ def generate_samples(n: int, seed: int) -> List[Dict[str, object]]:
         ("single_sphere", sample_single_sphere, _text_single_sphere),
         ("single_cons", sample_single_cons, _text_single_cons),
         ("single_trd", sample_single_trd, _text_single_trd),
+        ("single_polycone", sample_single_polycone, _text_single_polycone),
+        ("single_cuttubs", sample_single_cuttubs, _text_single_cuttubs),
+        ("boolean", sample_boolean_boxes, _text_boolean),
     ]
 
     samples: List[Dict[str, object]] = []

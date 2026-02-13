@@ -47,6 +47,20 @@ class Trd(Part):
 
 
 @dataclass(frozen=True)
+class Polycone(Part):
+    z_planes: Tuple[float, ...]
+    rmax: Tuple[float, ...]
+
+
+@dataclass(frozen=True)
+class CutTubs(Part):
+    rmax: float
+    hz: float
+    tilt_x: float = 0.0
+    tilt_y: float = 0.0
+
+
+@dataclass(frozen=True)
 class ShellTubsFromThicknesses(Part):
     inner_r: float
     thicknesses: Tuple[float, ...]
@@ -103,13 +117,35 @@ class Transform(Operator):
 
 
 @dataclass(frozen=True)
+class BooleanBinary(Operator):
+    op: str
+    left: str
+    right: str
+
+
+@dataclass(frozen=True)
 class Constraint:
     id: str
     kind: str
     params: Dict[str, Any] = field(default_factory=dict)
 
 
-Node = Union[Box, Tubs, Sphere, Cons, Trd, ShellTubsFromThicknesses, Nest, StackZ, GridXY, Ring, Transform]
+Node = Union[
+    Box,
+    Tubs,
+    Sphere,
+    Cons,
+    Trd,
+    Polycone,
+    CutTubs,
+    ShellTubsFromThicknesses,
+    Nest,
+    StackZ,
+    GridXY,
+    Ring,
+    Transform,
+    BooleanBinary,
+]
 
 
 @dataclass
@@ -127,12 +163,15 @@ _TYPE_MAP = {
     "Sphere": Sphere,
     "Cons": Cons,
     "Trd": Trd,
+    "Polycone": Polycone,
+    "CutTubs": CutTubs,
     "ShellTubsFromThicknesses": ShellTubsFromThicknesses,
     "Nest": Nest,
     "StackZ": StackZ,
     "GridXY": GridXY,
     "Ring": Ring,
     "Transform": Transform,
+    "BooleanBinary": BooleanBinary,
 }
 
 
@@ -168,6 +207,20 @@ def parse_graph(data: Dict[str, Any]) -> Graph:
                 y1=float(n["y1"]),
                 y2=float(n["y2"]),
                 z=float(n["z"]),
+            )
+        elif cls is Polycone:
+            node = Polycone(
+                id=nid,
+                z_planes=_as_tuple_floats(n["z_planes"]),
+                rmax=_as_tuple_floats(n["rmax"]),
+            )
+        elif cls is CutTubs:
+            node = CutTubs(
+                id=nid,
+                rmax=float(n["rmax"]),
+                hz=float(n["hz"]),
+                tilt_x=float(n.get("tilt_x", 0.0)),
+                tilt_y=float(n.get("tilt_y", 0.0)),
             )
         elif cls is ShellTubsFromThicknesses:
             node = ShellTubsFromThicknesses(
@@ -215,6 +268,13 @@ def parse_graph(data: Dict[str, Any]) -> Graph:
                 ry=float(n.get("ry", 0.0)),
                 rz=float(n.get("rz", 0.0)),
             )
+        elif cls is BooleanBinary:
+            node = BooleanBinary(
+                id=nid,
+                op=str(n["op"]),
+                left=str(n["left"]),
+                right=str(n["right"]),
+            )
         else:
             raise ValueError(f"Unhandled node type: {n_type}")
         nodes[nid] = node
@@ -258,6 +318,26 @@ def graph_to_dict(graph: Graph) -> Dict[str, Any]:
                     "y1": node.y1,
                     "y2": node.y2,
                     "z": node.z,
+                }
+            )
+        elif isinstance(node, Polycone):
+            out_nodes.append(
+                {
+                    "id": node.id,
+                    "type": "Polycone",
+                    "z_planes": list(node.z_planes),
+                    "rmax": list(node.rmax),
+                }
+            )
+        elif isinstance(node, CutTubs):
+            out_nodes.append(
+                {
+                    "id": node.id,
+                    "type": "CutTubs",
+                    "rmax": node.rmax,
+                    "hz": node.hz,
+                    "tilt_x": node.tilt_x,
+                    "tilt_y": node.tilt_y,
                 }
             )
         elif isinstance(node, ShellTubsFromThicknesses):
@@ -327,6 +407,16 @@ def graph_to_dict(graph: Graph) -> Dict[str, Any]:
                     "rx": node.rx,
                     "ry": node.ry,
                     "rz": node.rz,
+                }
+            )
+        elif isinstance(node, BooleanBinary):
+            out_nodes.append(
+                {
+                    "id": node.id,
+                    "type": "BooleanBinary",
+                    "op": node.op,
+                    "left": node.left,
+                    "right": node.right,
                 }
             )
         else:

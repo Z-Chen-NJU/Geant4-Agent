@@ -6,12 +6,15 @@ from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 from .dsl import (
+    BooleanBinary,
     Box,
     Cons,
+    CutTubs,
     Transform,
     Graph,
     GridXY,
     Nest,
+    Polycone,
     Ring,
     ShellTubsFromThicknesses,
     Sphere,
@@ -24,11 +27,15 @@ from .geom import (
     aabb_apply_transform,
     aabb_from_box,
     aabb_from_cons,
+    aabb_from_cuttubs,
+    aabb_from_polycone,
     aabb_from_sphere,
     aabb_from_trd,
     aabb_from_tubs,
+    aabb_intersection,
     aabb_ring,
     aabb_stackz,
+    aabb_union,
     aabb_union_xy,
 )
 
@@ -122,6 +129,21 @@ class FeasibilityChecker:
                 self._error(ErrorCode.E_SOLID_PARAM, node.id, "Trd x1,x2,y1,y2,z must be > 0")
                 self._suggest(node.id, "Set x1,x2,y1,y2,z > 0")
             aabb = aabb_from_trd(node.x1, node.x2, node.y1, node.y2, node.z)
+
+        elif isinstance(node, Polycone):
+            if len(node.z_planes) < 2 or len(node.z_planes) != len(node.rmax):
+                self._error(ErrorCode.E_SOLID_PARAM, node.id, "Polycone requires matching z_planes/rmax with len>=2")
+                self._suggest(node.id, "Provide z_planes and rmax arrays with same length >= 2")
+            if any(r <= 0 for r in node.rmax):
+                self._error(ErrorCode.E_SOLID_PARAM, node.id, "Polycone rmax entries must be > 0")
+                self._suggest(node.id, "Set all polycone rmax > 0")
+            aabb = aabb_from_polycone(node.z_planes, node.rmax)
+
+        elif isinstance(node, CutTubs):
+            if node.rmax <= 0 or node.hz <= 0:
+                self._error(ErrorCode.E_SOLID_PARAM, node.id, "CutTubs rmax,hz must be > 0")
+                self._suggest(node.id, "Set rmax>0 and hz>0")
+            aabb = aabb_from_cuttubs(node.rmax, node.hz, node.tilt_x, node.tilt_y)
 
         elif isinstance(node, ShellTubsFromThicknesses):
             if node.inner_r < 0 or node.hz <= 0:
@@ -228,6 +250,32 @@ class FeasibilityChecker:
                         "Rotation handled by conservative AABB envelope",
                     )
                 aabb = aabb_apply_transform(child, node.rx, node.ry, node.rz)
+
+        elif isinstance(node, BooleanBinary):
+            left = self._eval_node(node.left)
+            right = self._eval_node(node.right)
+            op = node.op.lower()
+            if op not in {"union", "subtraction", "intersection"}:
+                self._error(ErrorCode.E_SOLID_PARAM, node.id, "BooleanBinary op must be union/subtraction/intersection")
+                self._suggest(node.id, "Set op to union, subtraction, or intersection")
+            if left and right:
+                if op == "union":
+                    aabb = aabb_union(left, right)
+                elif op == "intersection":
+                    aabb = aabb_intersection(left, right)
+                    self._warn(
+                        ErrorCode.E_OVERLAP_RISK,
+                        node.id,
+                        "Intersection feasibility uses conservative AABB only",
+                    )
+                else:
+                    # subtraction: conservative outer envelope remains left operand.
+                    aabb = left
+                    self._warn(
+                        ErrorCode.E_OVERLAP_RISK,
+                        node.id,
+                        "Subtraction feasibility uses conservative AABB (left envelope)",
+                    )
         else:
             self._error(ErrorCode.E_UNKNOWN, node_id, "Unknown node type")
 

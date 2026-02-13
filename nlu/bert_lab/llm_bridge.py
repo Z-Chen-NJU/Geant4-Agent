@@ -26,6 +26,20 @@ PARAM_DESCRIPTIONS: Dict[str, str] = {
     "x2": "trd half-length in x at +z side (mm)",
     "y1": "trd half-length in y at -z side (mm)",
     "y2": "trd half-length in y at +z side (mm)",
+    "z1": "polycone z plane 1 (mm)",
+    "z2": "polycone z plane 2 (mm)",
+    "z3": "polycone z plane 3 (mm)",
+    "r1": "polycone radius at z1 (mm)",
+    "r2": "polycone radius at z2 (mm)",
+    "r3": "polycone radius at z3 (mm)",
+    "tilt_x": "cuttubs cut tilt in x (deg proxy)",
+    "tilt_y": "cuttubs cut tilt in y (deg proxy)",
+    "bool_a_x": "boolean left box x (mm)",
+    "bool_a_y": "boolean left box y (mm)",
+    "bool_a_z": "boolean left box z (mm)",
+    "bool_b_x": "boolean right box x (mm)",
+    "bool_b_y": "boolean right box y (mm)",
+    "bool_b_z": "boolean right box z (mm)",
     "inner_r": "inner radius (mm)",
     "th1": "shell thickness 1 (mm)",
     "th2": "shell thickness 2 (mm)",
@@ -96,11 +110,11 @@ def build_normalization_prompt(user_text: str) -> str:
         "Output JSON only with keys:\n"
         "- normalized_text: string\n"
         "- language_detected: string\n"
-        "- structure_hint: one of [ring, grid, nest, stack, shell, single_box, single_tubs, single_sphere, single_cons, single_trd, unknown]\n"
+        "- structure_hint: one of [ring, grid, nest, stack, shell, single_box, single_tubs, single_sphere, single_cons, single_trd, single_polycone, single_cuttubs, boolean, unknown]\n"
         "Normalization rules:\n"
         "- Preserve all numeric values and units exactly (do not convert or round).\n"
         "- Prefer this compact style in normalized_text:\n"
-        "  geometry_intent: <circular_placement|planar_array|containment_parent_child|z_layer_sequence|coaxial_shells|single_box|single_tubs|single_sphere|single_cons|single_trd|unresolved>; ...\n"
+        "  geometry_intent: <circular_placement|planar_array|containment_parent_child|z_layer_sequence|coaxial_shells|single_box|single_tubs|single_sphere|single_cons|single_trd|single_polycone|single_cuttubs|boolean|unresolved>; ...\n"
         "- If geometry is ambiguous, use:\n"
         "  geometry_intent: unresolved; candidate_pattern: <intent_a> | <intent_b>; ...\n"
         "- Keep text concise and field-like (semicolon-separated clauses), no narrative sentences.\n"

@@ -49,8 +49,51 @@ def _module_triplet(text: str) -> Tuple[float, float, float] | None:
     y = _parse_value_with_unit(m.group(2))
     z = _parse_value_with_unit(m.group(3))
     if x is None or y is None or z is None:
-        return None
+        m2 = re.search(
+            rf"(\d*\.?\d+)\s*(?:x|X|\*)\s*(\d*\.?\d+)\s*(?:x|X|\*)\s*(\d*\.?\d+)\s*({unit})",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if not m2:
+            return None
+        suffix = m2.group(4)
+        x = _parse_value_with_unit(f"{m2.group(1)} {suffix}")
+        y = _parse_value_with_unit(f"{m2.group(2)} {suffix}")
+        z = _parse_value_with_unit(f"{m2.group(3)} {suffix}")
+        if x is None or y is None or z is None:
+            return None
     return x, y, z
+
+
+def _all_triplets(text: str) -> List[Tuple[float, float, float]]:
+    unit = r"(?:mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)"
+    pattern = re.compile(
+        rf"(\d*\.?\d+\s*{unit})\s*(?:x|X|\*)\s*"
+        rf"(\d*\.?\d+\s*{unit})\s*(?:x|X|\*)\s*"
+        rf"(\d*\.?\d+\s*{unit})",
+        flags=re.IGNORECASE,
+    )
+    out: List[Tuple[float, float, float]] = []
+    for m in pattern.finditer(text):
+        x = _parse_value_with_unit(m.group(1))
+        y = _parse_value_with_unit(m.group(2))
+        z = _parse_value_with_unit(m.group(3))
+        if x is None or y is None or z is None:
+            continue
+        out.append((x, y, z))
+    compact = re.compile(
+        rf"(\d*\.?\d+)\s*(?:x|X|\*)\s*(\d*\.?\d+)\s*(?:x|X|\*)\s*(\d*\.?\d+)\s*({unit})",
+        flags=re.IGNORECASE,
+    )
+    for m in compact.finditer(text):
+        suffix = m.group(4)
+        x = _parse_value_with_unit(f"{m.group(1)} {suffix}")
+        y = _parse_value_with_unit(f"{m.group(2)} {suffix}")
+        z = _parse_value_with_unit(f"{m.group(3)} {suffix}")
+        if x is None or y is None or z is None:
+            continue
+        out.append((x, y, z))
+    return out
 
 
 def _cube_edge(text: str) -> float | None:
@@ -70,38 +113,53 @@ def _cube_edge(text: str) -> float | None:
 
 def _fill_by_patterns(text: str, out: Dict[str, float], notes: List[str]) -> None:
     unit = r"(?:mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)?"
+    num = r"[+\-]?\d*\.?\d+"
     for key, pattern in [
-        ("module_x", rf"(?:module[_\s-]*x)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("module_y", rf"(?:module[_\s-]*y)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("module_z", rf"(?:module[_\s-]*z)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("parent_x", rf"(?:parent[_\s-]*x)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("parent_y", rf"(?:parent[_\s-]*y)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("parent_z", rf"(?:parent[_\s-]*z)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("child_rmax", rf"(?:child[_\s-]*rmax|rmax)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("child_hz", rf"(?:child[_\s-]*hz|hz)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("rmax1", rf"(?:rmax1)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("rmax2", rf"(?:rmax2)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("x1", rf"(?:x1)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("x2", rf"(?:x2)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("y1", rf"(?:y1)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("y2", rf"(?:y2)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("stack_x", rf"(?:stack[_\s-]*x)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("stack_y", rf"(?:stack[_\s-]*y)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("t1", rf"\bt1\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("t2", rf"\bt2\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("t3", rf"\bt3\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("stack_clearance", rf"(?:stack[_\s-]*clearance)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("nest_clearance", rf"(?:nest[_\s-]*clearance)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("inner_r", rf"(?:inner[_\s-]*r)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("th1", rf"\bth1\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("th2", rf"\bth2\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("th3", rf"\bth3\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("tx", rf"(?:tx)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("ty", rf"(?:ty)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("tz", rf"(?:tz)\s*[:=]\s*([\d\.]+\s*{unit})"),
-        ("rx", rf"(?:rx)\s*[:=]\s*([\d\.]+)"),
-        ("ry", rf"(?:ry)\s*[:=]\s*([\d\.]+)"),
-        ("rz", rf"(?:rz)\s*[:=]\s*([\d\.]+)"),
+        ("module_x", rf"(?:module[_\s-]*x)\s*[:=]?\s*({num}\s*{unit})"),
+        ("module_y", rf"(?:module[_\s-]*y)\s*[:=]?\s*({num}\s*{unit})"),
+        ("module_z", rf"(?:module[_\s-]*z)\s*[:=]?\s*({num}\s*{unit})"),
+        ("parent_x", rf"(?:parent[_\s-]*x)\s*[:=]?\s*({num}\s*{unit})"),
+        ("parent_y", rf"(?:parent[_\s-]*y)\s*[:=]?\s*({num}\s*{unit})"),
+        ("parent_z", rf"(?:parent[_\s-]*z)\s*[:=]?\s*({num}\s*{unit})"),
+        ("child_rmax", rf"(?:child[_\s-]*rmax|rmax)\s*[:=]?\s*({num}\s*{unit})"),
+        ("child_hz", rf"(?:child[_\s-]*hz|hz)\s*[:=]?\s*({num}\s*{unit})"),
+        ("rmax1", rf"\brmax1\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("rmax2", rf"\brmax2\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("x1", rf"\bx1\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("x2", rf"\bx2\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("y1", rf"\by1\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("y2", rf"\by2\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("z1", rf"\bz1\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("z2", rf"\bz2\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("z3", rf"\bz3\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("r1", rf"\br1\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("r2", rf"\br2\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("r3", rf"\br3\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("tilt_x", rf"(?:tilt[_\s-]*x)\s*[:=]?\s*({num})"),
+        ("tilt_y", rf"(?:tilt[_\s-]*y)\s*[:=]?\s*({num})"),
+        ("bool_a_x", rf"(?:bool[_\s-]*a[_\s-]*x)\s*[:=]?\s*({num}\s*{unit})"),
+        ("bool_a_y", rf"(?:bool[_\s-]*a[_\s-]*y)\s*[:=]?\s*({num}\s*{unit})"),
+        ("bool_a_z", rf"(?:bool[_\s-]*a[_\s-]*z)\s*[:=]?\s*({num}\s*{unit})"),
+        ("bool_b_x", rf"(?:bool[_\s-]*b[_\s-]*x)\s*[:=]?\s*({num}\s*{unit})"),
+        ("bool_b_y", rf"(?:bool[_\s-]*b[_\s-]*y)\s*[:=]?\s*({num}\s*{unit})"),
+        ("bool_b_z", rf"(?:bool[_\s-]*b[_\s-]*z)\s*[:=]?\s*({num}\s*{unit})"),
+        ("stack_x", rf"(?:stack[_\s-]*x)\s*[:=]?\s*({num}\s*{unit})"),
+        ("stack_y", rf"(?:stack[_\s-]*y)\s*[:=]?\s*({num}\s*{unit})"),
+        ("t1", rf"\bt1\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("t2", rf"\bt2\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("t3", rf"\bt3\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("stack_clearance", rf"(?:stack[_\s-]*clearance)\s*[:=]?\s*({num}\s*{unit})"),
+        ("nest_clearance", rf"(?:nest[_\s-]*clearance)\s*[:=]?\s*({num}\s*{unit})"),
+        ("inner_r", rf"(?:inner[_\s-]*r)\s*[:=]?\s*({num}\s*{unit})"),
+        ("th1", rf"\bth1\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("th2", rf"\bth2\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("th3", rf"\bth3\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("tx", rf"\btx\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("ty", rf"\bty\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("tz", rf"\btz\b\s*[:=]?\s*({num}\s*{unit})"),
+        ("rx", rf"\brx\b\s*[:=]?\s*({num})"),
+        ("ry", rf"\bry\b\s*[:=]?\s*({num})"),
+        ("rz", rf"\brz\b\s*[:=]?\s*({num})"),
     ]:
         if key in out:
             continue
@@ -123,23 +181,41 @@ def merge_params(text: str, params: Dict[str, float]) -> Tuple[Dict[str, float],
     notes: List[str] = []
     _fill_by_patterns(text, out, notes)
 
-    triplet = _module_triplet(text)
-    if triplet and not ("module_x" in out and "module_y" in out and "module_z" in out):
-        out.setdefault("module_x", triplet[0])
-        out.setdefault("module_y", triplet[1])
-        out.setdefault("module_z", triplet[2])
-        notes.append("filled module_x/module_y/module_z from triplet")
-    elif not ("module_x" in out and "module_y" in out and "module_z" in out):
-        edge = _cube_edge(text)
-        if edge is not None:
-            out.setdefault("module_x", edge)
-            out.setdefault("module_y", edge)
-            out.setdefault("module_z", edge)
-            notes.append("filled module_x/module_y/module_z from cube edge")
+    boolean_context = "boolean" in text.lower()
+    if not boolean_context:
+        triplet = _module_triplet(text)
+        if triplet and not ("module_x" in out and "module_y" in out and "module_z" in out):
+            out.setdefault("module_x", triplet[0])
+            out.setdefault("module_y", triplet[1])
+            out.setdefault("module_z", triplet[2])
+            notes.append("filled module_x/module_y/module_z from triplet")
+        elif not ("module_x" in out and "module_y" in out and "module_z" in out):
+            edge = _cube_edge(text)
+            if edge is not None:
+                out.setdefault("module_x", edge)
+                out.setdefault("module_y", edge)
+                out.setdefault("module_z", edge)
+                notes.append("filled module_x/module_y/module_z from cube edge")
+
+    if boolean_context or ("bool_a_x" in out or "bool_b_x" in out):
+        trips = _all_triplets(text)
+        if len(trips) >= 2:
+            a = trips[0]
+            b = trips[1]
+            if "bool_a_x" not in out:
+                out["bool_a_x"] = a[0]
+                out["bool_a_y"] = a[1]
+                out["bool_a_z"] = a[2]
+                notes.append("filled bool_a_* from first triplet")
+            if "bool_b_x" not in out:
+                out["bool_b_x"] = b[0]
+                out["bool_b_y"] = b[1]
+                out["bool_b_z"] = b[2]
+                notes.append("filled bool_b_* from second triplet")
 
     for key, pattern in [
-        ("radius", r"radius\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
-        ("radius", r"\bR\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
+        ("radius", r"\bradius\b\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
+        ("radius", r"\bR(?!\d)\b\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
         ("clearance", r"clearance\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
         ("clearance", r"gap\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
         ("pitch_x", r"pitch[_\s-]*x\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
@@ -162,8 +238,5 @@ def merge_params(text: str, params: Dict[str, float]) -> Tuple[Dict[str, float],
             out[k] = int(round(v))
         else:
             out[k] = float(v)
-        if out[k] < 0:
-            out[k] = abs(out[k])
-            notes.append(f"clamped {k} to abs")
 
     return out, notes

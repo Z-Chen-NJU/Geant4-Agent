@@ -20,6 +20,11 @@ SKELETON_SUMMARY: Dict[str, str] = {
     "single_sphere": "single_sphere",
     "single_cons": "single_cons",
     "single_trd": "single_trd",
+    "single_polycone": "single_polycone",
+    "single_cuttubs": "single_cuttubs",
+    "boolean_union_boxes": "boolean",
+    "boolean_subtraction_boxes": "boolean",
+    "boolean_intersection_boxes": "boolean",
     "tilted_box_in_parent": "nest",
 }
 
@@ -34,6 +39,9 @@ KEYWORD_CUES: Dict[str, Tuple[str, ...]] = {
     "single_sphere": ("single_sphere", "sphere", "ball"),
     "single_cons": ("single_cons", "cons", "cone", "frustum"),
     "single_trd": ("single_trd", "trd", "trapezoid", "trapezoidal"),
+    "single_polycone": ("single_polycone", "polycone", "z planes"),
+    "single_cuttubs": ("single_cuttubs", "cuttubs", "cut tubs"),
+    "boolean": ("boolean", "union", "subtraction", "intersection"),
 }
 
 AMBIGUITY_CUES = ("ambiguous", "undecided", "unresolved", "not fixed")
@@ -75,14 +83,19 @@ def _cue_score(text: str, structure: str) -> float:
     t = text.lower()
     score = 0.0
     for kw in KEYWORD_CUES.get(structure, ()):
-        if kw.lower() in t:
+        needle = kw.lower()
+        if " " in needle:
+            if needle in t:
+                score += 0.32
+            continue
+        if re.search(rf"(?<![a-z0-9_]){re.escape(needle)}(?![a-z0-9_])", t):
             score += 0.32
     return score
 
 
 def _explicit_structure_hint(text: str) -> str:
     m = re.search(
-        r"(?:^|[;\s])structure\s*[:=]\s*(ring|grid|nest|stack|shell|single_box|single_tubs|single_sphere|single_cons|single_trd)\b",
+        r"(?:^|[;\s])structure\s*[:=]\s*(ring|grid|nest|stack|shell|single_box|single_tubs|single_sphere|single_cons|single_trd|single_polycone|single_cuttubs|boolean)\b",
         text,
         flags=re.IGNORECASE,
     )
@@ -168,6 +181,11 @@ def search_candidate_graphs(
         "single_sphere",
         "single_cons",
         "single_trd",
+        "single_polycone",
+        "single_cuttubs",
+        "boolean_union_boxes",
+        "boolean_subtraction_boxes",
+        "boolean_intersection_boxes",
     }
     scored_candidates: List[CandidateGraph] = []
     raw_scores_by_summary: Dict[str, float] = {}

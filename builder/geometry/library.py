@@ -5,11 +5,14 @@ from dataclasses import dataclass
 from typing import Callable, Dict, List, Tuple
 
 from .dsl import (
+    BooleanBinary,
     Box,
     Cons,
+    CutTubs,
     Graph,
     GridXY,
     Nest,
+    Polycone,
     Ring,
     ShellTubsFromThicknesses,
     Sphere,
@@ -246,6 +249,89 @@ def sample_single_trd(rng: random.Random) -> Dict[str, float]:
     }
 
 
+def build_single_polycone(p: Dict[str, float]) -> Graph:
+    nodes = {
+        "polycone": Polycone(
+            id="polycone",
+            z_planes=(p["z1"], p["z2"], p["z3"]),
+            rmax=(p["r1"], p["r2"], p["r3"]),
+        )
+    }
+    return Graph(nodes=nodes, root="polycone")
+
+
+def sample_single_polycone(rng: random.Random) -> Dict[str, float]:
+    hz = _sample_uniform(rng, 5.0, 120.0)
+    return {
+        "z1": -hz,
+        "z2": 0.0,
+        "z3": hz,
+        "r1": _sample_uniform(rng, 2.0, 80.0),
+        "r2": _sample_uniform(rng, 2.0, 80.0),
+        "r3": _sample_uniform(rng, 2.0, 80.0),
+    }
+
+
+def build_single_cuttubs(p: Dict[str, float]) -> Graph:
+    nodes = {
+        "cuttubs": CutTubs(
+            id="cuttubs",
+            rmax=p["child_rmax"],
+            hz=p["child_hz"],
+            tilt_x=p["tilt_x"],
+            tilt_y=p["tilt_y"],
+        )
+    }
+    return Graph(nodes=nodes, root="cuttubs")
+
+
+def sample_single_cuttubs(rng: random.Random) -> Dict[str, float]:
+    return {
+        "child_rmax": _sample_uniform(rng, 2.0, 90.0),
+        "child_hz": _sample_uniform(rng, 2.0, 120.0),
+        "tilt_x": _sample_uniform(rng, 0.0, 15.0),
+        "tilt_y": _sample_uniform(rng, 0.0, 15.0),
+    }
+
+
+def build_boolean_union_boxes(p: Dict[str, float]) -> Graph:
+    nodes = {
+        "a": Box(id="a", x=p["bool_a_x"], y=p["bool_a_y"], z=p["bool_a_z"]),
+        "b": Box(id="b", x=p["bool_b_x"], y=p["bool_b_y"], z=p["bool_b_z"]),
+        "bool": BooleanBinary(id="bool", op="union", left="a", right="b"),
+    }
+    return Graph(nodes=nodes, root="bool")
+
+
+def build_boolean_subtraction_boxes(p: Dict[str, float]) -> Graph:
+    nodes = {
+        "a": Box(id="a", x=p["bool_a_x"], y=p["bool_a_y"], z=p["bool_a_z"]),
+        "b": Box(id="b", x=p["bool_b_x"], y=p["bool_b_y"], z=p["bool_b_z"]),
+        "bool": BooleanBinary(id="bool", op="subtraction", left="a", right="b"),
+    }
+    return Graph(nodes=nodes, root="bool")
+
+
+def build_boolean_intersection_boxes(p: Dict[str, float]) -> Graph:
+    nodes = {
+        "a": Box(id="a", x=p["bool_a_x"], y=p["bool_a_y"], z=p["bool_a_z"]),
+        "b": Box(id="b", x=p["bool_b_x"], y=p["bool_b_y"], z=p["bool_b_z"]),
+        "bool": BooleanBinary(id="bool", op="intersection", left="a", right="b"),
+    }
+    return Graph(nodes=nodes, root="bool")
+
+
+def sample_boolean_boxes(rng: random.Random) -> Dict[str, float]:
+    return {
+        "bool_a_x": _sample_uniform(rng, 5.0, 80.0),
+        "bool_a_y": _sample_uniform(rng, 5.0, 80.0),
+        "bool_a_z": _sample_uniform(rng, 5.0, 80.0),
+        "bool_b_x": _sample_uniform(rng, 5.0, 80.0),
+        "bool_b_y": _sample_uniform(rng, 5.0, 80.0),
+        "bool_b_z": _sample_uniform(rng, 5.0, 80.0),
+    }
+
+
 def build_tilted_box_in_parent(p: Dict[str, float]) -> Graph:
     nodes = {
         "parent": Box(id="parent", x=p["parent_x"], y=p["parent_y"], z=p["parent_z"]),
@@ -403,6 +489,46 @@ register_skeleton(
         ),
     )
 )
+register_skeleton(
+    Skeleton(
+        name="single_polycone",
+        build_fn=build_single_polycone,
+        param_sampler=sample_single_polycone,
+        param_keys=("z1", "z2", "z3", "r1", "r2", "r3"),
+    )
+)
+register_skeleton(
+    Skeleton(
+        name="single_cuttubs",
+        build_fn=build_single_cuttubs,
+        param_sampler=sample_single_cuttubs,
+        param_keys=("child_rmax", "child_hz", "tilt_x", "tilt_y"),
+    )
+)
+register_skeleton(
+    Skeleton(
+        name="boolean_union_boxes",
+        build_fn=build_boolean_union_boxes,
+        param_sampler=sample_boolean_boxes,
+        param_keys=("bool_a_x", "bool_a_y", "bool_a_z", "bool_b_x", "bool_b_y", "bool_b_z"),
+    )
+)
+register_skeleton(
+    Skeleton(
+        name="boolean_subtraction_boxes",
+        build_fn=build_boolean_subtraction_boxes,
+        param_sampler=sample_boolean_boxes,
+        param_keys=("bool_a_x", "bool_a_y", "bool_a_z", "bool_b_x", "bool_b_y", "bool_b_z"),
+    )
+)
+register_skeleton(
+    Skeleton(
+        name="boolean_intersection_boxes",
+        build_fn=build_boolean_intersection_boxes,
+        param_sampler=sample_boolean_boxes,
+        param_keys=("bool_a_x", "bool_a_y", "bool_a_z", "bool_b_x", "bool_b_y", "bool_b_z"),
+    )
+)
 
 
 PARAM_SIGNATURE_KEYS: Tuple[str, ...] = (
@@ -445,6 +571,20 @@ PARAM_SIGNATURE_KEYS: Tuple[str, ...] = (
     "rx",
     "ry",
     "rz",
+    "z1",
+    "z2",
+    "z3",
+    "r1",
+    "r2",
+    "r3",
+    "tilt_x",
+    "tilt_y",
+    "bool_a_x",
+    "bool_a_y",
+    "bool_a_z",
+    "bool_b_x",
+    "bool_b_y",
+    "bool_b_z",
 )
 
 
@@ -490,5 +630,19 @@ def sample_param_signature(rng: random.Random) -> Dict[str, float]:
         "rx": _sample_uniform(rng, 0.0, 30.0),
         "ry": _sample_uniform(rng, 0.0, 30.0),
         "rz": _sample_uniform(rng, 0.0, 45.0),
+        "z1": _sample_uniform(rng, -60.0, -5.0),
+        "z2": 0.0,
+        "z3": _sample_uniform(rng, 5.0, 60.0),
+        "r1": _sample_uniform(rng, 2.0, 40.0),
+        "r2": _sample_uniform(rng, 2.0, 40.0),
+        "r3": _sample_uniform(rng, 2.0, 40.0),
+        "tilt_x": _sample_uniform(rng, 0.0, 15.0),
+        "tilt_y": _sample_uniform(rng, 0.0, 15.0),
+        "bool_a_x": _sample_uniform(rng, 5.0, 60.0),
+        "bool_a_y": _sample_uniform(rng, 5.0, 60.0),
+        "bool_a_z": _sample_uniform(rng, 5.0, 60.0),
+        "bool_b_x": _sample_uniform(rng, 5.0, 60.0),
+        "bool_b_y": _sample_uniform(rng, 5.0, 60.0),
+        "bool_b_z": _sample_uniform(rng, 5.0, 60.0),
     }
 

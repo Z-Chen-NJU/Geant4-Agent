@@ -34,3 +34,33 @@ def test_grid_infeasible():
     report = check_feasibility(graph)
     assert not report.ok
 
+
+def test_polycone_ok():
+    text = json.dumps(
+        {
+            "nodes": [
+                {"id": "pc", "type": "Polycone", "z_planes": [-10, 0, 10], "rmax": [4, 6, 5]},
+            ],
+            "root": "pc",
+        }
+    )
+    graph = parse_graph_json(text)
+    report = check_feasibility(graph)
+    assert report.ok
+
+
+def test_boolean_union_ok():
+    text = json.dumps(
+        {
+            "nodes": [
+                {"id": "a", "type": "Box", "x": 10, "y": 8, "z": 6},
+                {"id": "b", "type": "Box", "x": 12, "y": 6, "z": 4},
+                {"id": "u", "type": "BooleanBinary", "op": "union", "left": "a", "right": "b"},
+            ],
+            "root": "u",
+        }
+    )
+    graph = parse_graph_json(text)
+    report = check_feasibility(graph)
+    assert report.ok
+

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Dict, List
 
 from nlu.bert_lab.ollama_client import chat
@@ -10,19 +11,29 @@ def _friendly_missing(missing: List[str], lang: str) -> List[str]:
         mapping = {
             "geometry.structure": "geometry structure (box / ring / grid / stack / shell)",
             "materials.selected_materials": "materials (e.g., G4_WATER / G4_Al / G4_Si)",
+            "materials.volume_material_map": "volume-to-material mapping",
             "source.particle": "particle type (gamma / e- / proton)",
             "source.type": "source type (point / beam / isotropic)",
+            "source.energy": "source energy (MeV)",
+            "source.position": "source position (x, y, z)",
+            "source.direction": "source direction (dx, dy, dz)",
             "physics.physics_list": "physics list (e.g., FTFP_BERT)",
             "output.format": "output format (root / csv / json)",
+            "output.path": "output path",
         }
     else:
         mapping = {
             "geometry.structure": "几何结构（如 box / ring / grid / stack / shell）",
             "materials.selected_materials": "材料（如 G4_WATER / G4_Al / G4_Si）",
+            "materials.volume_material_map": "体积与材料映射",
             "source.particle": "粒子类型（如 gamma / e- / proton）",
             "source.type": "源类型（如 point / beam / isotropic）",
+            "source.energy": "源能量（MeV）",
+            "source.position": "源位置（x, y, z）",
+            "source.direction": "源方向（dx, dy, dz）",
             "physics.physics_list": "物理过程列表（如 FTFP_BERT）",
             "output.format": "输出格式（如 root / csv / json）",
+            "output.path": "输出路径",
         }
     friendly = []
     for item in missing:
@@ -38,7 +49,7 @@ def ask_missing(
     missing: List[str],
     lang: str,
     ollama_config: str = "nlu/bert_lab/configs/ollama_config.json",
-    temperature: float = 0.2,
+    temperature: float = 1.0,
 ) -> str:
     if not missing:
         return ""
@@ -59,7 +70,13 @@ def ask_missing(
         )
     try:
         resp = chat(prompt, config_path=ollama_config, temperature=temperature)
-        text = resp.get("response", "").strip()
+        text = re.sub(
+            r"<think>.*?</think>",
+            "",
+            str(resp.get("response", "")),
+            flags=re.IGNORECASE | re.DOTALL,
+        ).strip()
+        text = re.sub(r"^```[a-zA-Z0-9_-]*\s*|\s*```$", "", text, flags=re.DOTALL).strip()
         if text:
             return text
     except Exception:

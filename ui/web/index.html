@@ -29,6 +29,10 @@
 
         <div class="grid">
           <label class="field">
+            <span data-i18n="model_label">LLM Config</span>
+            <select id="model-config-select"></select>
+          </label>
+          <label class="field">
             <span data-i18n="lang_label">Language</span>
             <select id="lang-select">
               <option value="zh">中文</option>
@@ -76,6 +80,11 @@
             <pre id="response"></pre>
           </div>
         </div>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="process_title">Process</h2>
+        <pre id="process-log"></pre>
       </section>
 
       <footer class="footer"><span data-i18n="footer">Local-only: no external UI dependencies.</span></footer>

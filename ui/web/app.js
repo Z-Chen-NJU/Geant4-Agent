@@ -3,7 +3,10 @@
 const state = {
   sessionId: localStorage.getItem("g4_session_id") || "",
   lang: localStorage.getItem("g4_lang") || "zh",
+  ollamaConfigPath: localStorage.getItem("g4_ollama_config_path") || "",
+  ollamaModel: "",
   lastMeta: null,
+  lastProcess: null,
 };
 
 const i18n = {
@@ -13,6 +16,7 @@ const i18n = {
     input_title: "输入",
     input_label: "请描述你的实验设想",
     input_placeholder: "例如：我想用gamma打一个铜立方体，看看能量沉积...",
+    model_label: "LLM 配置",
     lang_label: "Language",
     min_conf: "结构置信度阈值",
     autofix: "自动修正",
@@ -24,6 +28,7 @@ const i18n = {
     output: "输出",
     summary: "摘要",
     config_json: "配置 JSON",
+    process_title: "过程面板",
     footer: "本地运行，不依赖外部前端服务。",
     summary_lines: {
       geometry_structure: "几何结构",
@@ -39,6 +44,7 @@ const i18n = {
       missing: "未指定",
       unknown: "未确定",
       undefined: "未判定",
+      none: "无",
     },
   },
   en: {
@@ -47,6 +53,7 @@ const i18n = {
     input_title: "Input",
     input_label: "Describe your experiment",
     input_placeholder: "e.g., shoot gamma at a copper cube and observe energy deposition...",
+    model_label: "LLM Config",
     lang_label: "Language",
     min_conf: "Structure confidence threshold",
     autofix: "Auto-fix",
@@ -58,6 +65,7 @@ const i18n = {
     output: "Output",
     summary: "Summary",
     config_json: "Config JSON",
+    process_title: "Process Panel",
     footer: "Local-only: no external UI dependencies.",
     summary_lines: {
       geometry_structure: "Geometry",
@@ -73,6 +81,7 @@ const i18n = {
       missing: "missing",
       unknown: "unknown",
       undefined: "undefined",
+      none: "none",
     },
   },
 };
@@ -95,6 +104,7 @@ function summarizeConfig(cfg) {
     `${t.phase}: ${meta.phase_title ?? t.unknown}`,
     `${t.complete}: ${meta.is_complete ? "true" : "false"}`,
     `${t.asked}: ${(meta.asked_fields_friendly || []).join(", ") || t.missing}`,
+    `LLM: ${state.ollamaModel || t.unknown}`,
     `${t.geometry_structure}: ${geomLabel}`,
     `${t.geometry_feasible}: ${cfg.geometry?.feasible ?? t.undefined}`,
     `${t.materials}: ${(cfg.materials?.selected_materials || []).join(", ") || t.missing}`,
@@ -103,6 +113,73 @@ function summarizeConfig(cfg) {
     `${t.physics_list}: ${cfg.physics?.physics_list ?? t.missing}`,
     `${t.output_format}: ${cfg.output?.format ?? t.missing}`,
   ].join("\n");
+}
+
+function summarizeProcess(proc) {
+  const t = i18n[state.lang].summary_lines;
+  if (!proc) return "";
+  const rejected = Array.isArray(proc.rejected_updates) ? proc.rejected_updates : [];
+  const violations = Array.isArray(proc.violations) ? proc.violations : [];
+  const rules = Array.isArray(proc.applied_rules) ? proc.applied_rules : [];
+  const asked = Array.isArray(proc.asked_fields_friendly) ? proc.asked_fields_friendly : [];
+  const topRejected = rejected.slice(0, 6).map((x) => `${x.path || "?"} :: ${x.reason_code || "unknown"}`);
+  const topViolations = violations.slice(0, 6).map((x) => `${x.path || "?"} :: ${x.code || "unknown"}`);
+  const topRules = rules.slice(0, 6).map((x) => `${x.path || "?"} <- ${x.producer || x.rule || "rule"}`);
+  return [
+    `llm_used: ${proc.llm_used ? "true" : "false"}`,
+    `fallback_reason: ${proc.fallback_reason || t.none}`,
+    `internal_temp: ${proc.temperatures?.internal ?? t.none}`,
+    `user_temp: ${proc.temperatures?.user ?? t.none}`,
+    `phase: ${proc.phase_title || proc.phase || t.unknown}`,
+    `asked: ${asked.join(", ") || t.none}`,
+    `rejected_updates:`,
+    ...(topRejected.length ? topRejected : [t.none]),
+    `violations:`,
+    ...(topViolations.length ? topViolations : [t.none]),
+    `applied_rules:`,
+    ...(topRules.length ? topRules : [t.none]),
+  ].join("\n");
+}
+
+async function loadRuntimeConfigs() {
+  const sel = $("model-config-select");
+  if (!sel) return;
+  const res = await fetch("/api/runtime");
+  const data = await res.json();
+  const available = Array.isArray(data.available) ? data.available : [];
+
+  sel.innerHTML = "";
+  available.forEach((item) => {
+    const opt = document.createElement("option");
+    opt.value = item.path;
+    opt.textContent = `${item.model} (${item.path.split("/").pop()})`;
+    sel.appendChild(opt);
+  });
+
+  const preferred = state.ollamaConfigPath || data.current_path || (available[0] && available[0].path) || "";
+  if (preferred) {
+    sel.value = preferred;
+  }
+  state.ollamaModel = data.current_model || "";
+  state.ollamaConfigPath = sel.value || "";
+  if (state.ollamaConfigPath) {
+    localStorage.setItem("g4_ollama_config_path", state.ollamaConfigPath);
+  }
+}
+
+async function applyRuntimeConfig(path) {
+  const res = await fetch("/api/runtime", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ollama_config_path: path }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    throw new Error(data.message || "failed to set runtime config");
+  }
+  state.ollamaConfigPath = data.current_path || path;
+  state.ollamaModel = data.current_model || "";
+  localStorage.setItem("g4_ollama_config_path", state.ollamaConfigPath);
 }
 
 async function sendStep() {
@@ -115,6 +192,7 @@ async function sendStep() {
     session_id: state.sessionId || null,
     text,
     min_confidence: Number($("min-conf").value || 0.6),
+    strict_mode: true,
     autofix: $("autofix").checked,
     llm_router: $("llm-router").checked,
     llm_question: $("llm-question") ? $("llm-question").checked : true,
@@ -143,8 +221,20 @@ async function sendStep() {
     asked_fields_friendly: data.asked_fields_friendly || [],
     is_complete: !!data.is_complete,
   };
+  state.lastProcess = {
+    llm_used: !!data.llm_used,
+    fallback_reason: data.fallback_reason || "",
+    temperatures: data.temperatures || {},
+    phase: data.phase,
+    phase_title: data.phase_title,
+    asked_fields_friendly: data.asked_fields_friendly || [],
+    rejected_updates: data.rejected_updates || [],
+    violations: data.violations || [],
+    applied_rules: data.applied_rules || [],
+  };
   $("summary").textContent = summarizeConfig(data.config);
   $("response").textContent = JSON.stringify(data.config || {}, null, 2);
+  $("process-log").textContent = summarizeProcess(state.lastProcess);
 }
 
 async function resetSession() {
@@ -160,9 +250,43 @@ async function resetSession() {
   $("chat").innerHTML = "";
   $("summary").textContent = "";
   $("response").textContent = "";
+  $("process-log").textContent = "";
+  state.lastProcess = null;
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  const modelSelect = $("model-config-select");
+  if (modelSelect) {
+    loadRuntimeConfigs()
+      .then(() => {
+        if ($("summary").textContent) {
+          try {
+            const cfg = JSON.parse($("response").textContent || "{}");
+            $("summary").textContent = summarizeConfig(cfg);
+          } catch (_) {}
+        }
+      })
+      .catch((err) => {
+        addMessage("assistant", `runtime config load failed: ${err.message}`);
+      });
+    modelSelect.addEventListener("change", async (e) => {
+      const nextPath = e.target.value || "";
+      if (!nextPath) return;
+      try {
+        await applyRuntimeConfig(nextPath);
+        addMessage("assistant", `LLM config switched: ${state.ollamaModel}`);
+        if ($("summary").textContent) {
+          try {
+            const cfg = JSON.parse($("response").textContent || "{}");
+            $("summary").textContent = summarizeConfig(cfg);
+          } catch (_) {}
+        }
+      } catch (err) {
+        addMessage("assistant", `runtime config update failed: ${err.message}`);
+      }
+    });
+  }
+
   const select = $("lang-select");
   select.value = state.lang;
   select.addEventListener("change", (e) => {

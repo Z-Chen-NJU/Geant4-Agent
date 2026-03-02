@@ -119,13 +119,20 @@ CASES: list[Case] = [
 ]
 
 
-def _run_case(case: Case, *, min_conf: float, autofix: bool) -> dict[str, Any]:
+def _run_case(
+    case: Case,
+    *,
+    min_conf: float,
+    autofix: bool,
+    normalize_input: bool,
+    llm_fill_missing: bool,
+) -> dict[str, Any]:
     out = solve(
         {
             "text": case.text,
             "min_confidence": min_conf,
-            "normalize_input": False,
-            "llm_fill_missing": False,
+            "normalize_input": normalize_input,
+            "llm_fill_missing": llm_fill_missing,
             "autofix": autofix,
         }
     )
@@ -186,13 +193,24 @@ def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+def _write_markdown(
+    path: Path,
+    summary: dict[str, Any],
+    rows: list[dict[str, Any]],
+    *,
+    normalize_input: bool,
+    llm_fill_missing: bool,
+) -> None:
     lines: list[str] = []
     lines.append("# 三类端到端回归报告")
     lines.append("")
     lines.append(f"- 日期: {date.today().isoformat()}")
     lines.append("- 流程: user text -> semantic parse -> candidate graph search -> feasibility")
-    lines.append("- 说明: 本轮为可复现实验，关闭 Ollama 依赖（`normalize_input=false`, `llm_fill_missing=false`）")
+    lines.append(
+        "- 说明: "
+        f"`normalize_input={'true' if normalize_input else 'false'}`, "
+        f"`llm_fill_missing={'true' if llm_fill_missing else 'false'}`"
+    )
     lines.append("")
     lines.append("## 总体结果")
     lines.append("")
@@ -230,17 +248,28 @@ def main() -> None:
     ap.add_argument("--out_md", default=f"docs/regression_3class_report_{date.today().isoformat()}.md")
     ap.add_argument("--min_confidence", type=float, default=0.6)
     ap.add_argument("--autofix", action="store_true")
+    ap.add_argument("--normalize_input", action="store_true")
+    ap.add_argument("--llm_fill_missing", action="store_true")
     args = ap.parse_args()
 
-    rows = [_run_case(c, min_conf=args.min_confidence, autofix=args.autofix) for c in CASES]
+    rows = [
+        _run_case(
+            c,
+            min_conf=args.min_confidence,
+            autofix=args.autofix,
+            normalize_input=args.normalize_input,
+            llm_fill_missing=args.llm_fill_missing,
+        )
+        for c in CASES
+    ]
     summary = _summary(rows)
 
     payload = {
         "config": {
             "min_confidence": args.min_confidence,
             "autofix": args.autofix,
-            "normalize_input": False,
-            "llm_fill_missing": False,
+            "normalize_input": args.normalize_input,
+            "llm_fill_missing": args.llm_fill_missing,
         },
         "summary": summary,
         "results": rows,
@@ -249,7 +278,13 @@ def main() -> None:
     out_json = Path(args.out_json)
     out_json.parent.mkdir(parents=True, exist_ok=True)
     out_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    _write_markdown(Path(args.out_md), summary, rows)
+    _write_markdown(
+        Path(args.out_md),
+        summary,
+        rows,
+        normalize_input=args.normalize_input,
+        llm_fill_missing=args.llm_fill_missing,
+    )
 
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     print(f"saved: {out_json}")

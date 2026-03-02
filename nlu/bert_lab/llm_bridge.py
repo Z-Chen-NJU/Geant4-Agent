@@ -104,7 +104,89 @@ def build_missing_params_prompt(structure: str, missing: Iterable[str], fmt: str
     return f"[structure={structure}]\n{header}\n{lines}\nReturn a JSON object with these keys."
 
 
-def build_normalization_prompt(user_text: str) -> str:
+def build_normalization_prompt(user_text: str, context_summary: str = "") -> str:
+    canonical_keys = [
+        "geometry_intent",
+        "structure",
+        "n",
+        "nx",
+        "ny",
+        "module_x",
+        "module_y",
+        "module_z",
+        "pitch_x",
+        "pitch_y",
+        "radius",
+        "clearance",
+        "parent_x",
+        "parent_y",
+        "parent_z",
+        "child_rmax",
+        "child_hz",
+        "rmax1",
+        "rmax2",
+        "x1",
+        "x2",
+        "y1",
+        "y2",
+        "z1",
+        "z2",
+        "z3",
+        "r1",
+        "r2",
+        "r3",
+        "tilt_x",
+        "tilt_y",
+        "bool_a_x",
+        "bool_a_y",
+        "bool_a_z",
+        "bool_b_x",
+        "bool_b_y",
+        "bool_b_z",
+        "stack_x",
+        "stack_y",
+        "t1",
+        "t2",
+        "t3",
+        "stack_clearance",
+        "nest_clearance",
+        "inner_r",
+        "th1",
+        "th2",
+        "th3",
+        "hz",
+        "particle",
+        "source_type",
+        "energy",
+        "position",
+        "direction",
+        "material",
+        "physics_list",
+        "output_format",
+        "output_path",
+    ]
+    banned_aliases = [
+        "num_elements",
+        "element_size",
+        "module_size",
+        "dimensions",
+        "element_radius",
+        "element_clearance",
+        "source_position",
+        "source_direction",
+    ]
+    intents = (
+        "circular_placement|planar_array|containment_parent_child|z_layer_sequence|"
+        "coaxial_shells|single_box|single_tubs|single_sphere|single_cons|single_trd|"
+        "single_polycone|single_cuttubs|boolean|unresolved"
+    )
+    ctx_block = ""
+    if context_summary.strip():
+        ctx_block = (
+            "Session context (persistent facts from previous turns; keep unless user explicitly changes them):\n"
+            f"{context_summary}\n"
+        )
+
     return (
         "Rewrite the user request into controlled English for downstream BERT parsing.\n"
         "Output JSON only with keys:\n"
@@ -113,15 +195,25 @@ def build_normalization_prompt(user_text: str) -> str:
         "- structure_hint: one of [ring, grid, nest, stack, shell, single_box, single_tubs, single_sphere, single_cons, single_trd, single_polycone, single_cuttubs, boolean, unknown]\n"
         "Normalization rules:\n"
         "- Preserve all numeric values and units exactly (do not convert or round).\n"
-        "- Prefer this compact style in normalized_text:\n"
-        "  geometry_intent: <circular_placement|planar_array|containment_parent_child|z_layer_sequence|coaxial_shells|single_box|single_tubs|single_sphere|single_cons|single_trd|single_polycone|single_cuttubs|boolean|unresolved>; ...\n"
+        "- normalized_text must be semicolon-separated key:value clauses (no narrative sentence).\n"
+        f"- geometry_intent must be one of: {intents}.\n"
+        "- If user text does not explicitly mention geometry shape/layout, geometry_intent must be unresolved.\n"
+        "- Use only these canonical keys in normalized_text (plus geometry_intent):\n"
+        f"  {', '.join(canonical_keys)}\n"
+        "- Do NOT output alias keys such as:\n"
+        f"  {', '.join(banned_aliases)}\n"
+        "- For 3D size, always emit module_x/module_y/module_z instead of any packed form.\n"
+        "- For source vectors, always emit position and direction.\n"
         "- If geometry is ambiguous, use:\n"
-        "  geometry_intent: unresolved; candidate_pattern: <intent_a> | <intent_b>; ...\n"
+        "  geometry_intent: unresolved; structure: unknown; ...\n"
+        "- If current turn omits fields but context already contains stable values, keep those values.\n"
+        "- Only overwrite a context value when user explicitly requests a change.\n"
         "- Keep text concise and field-like (semicolon-separated clauses), no narrative sentences.\n"
         "- Include only information present in user text; do not hallucinate values.\n"
         "- No explanation or markdown.\n"
-        f"User text: {user_text}\n"
-        "JSON:"
+        + ctx_block
+        + f"User text: {user_text}\n"
+        + "JSON:"
     )
 
 

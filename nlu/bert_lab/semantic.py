@@ -6,12 +6,12 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.semantic_frame import SemanticFrame
-from nlu.bert_lab.graph_search import search_candidate_graphs
-from nlu.bert_lab.infer import extract_params
+from nlu.runtime_components.graph_search import search_candidate_graphs
+from nlu.runtime_components.infer import extract_params
 from nlu.bert_lab.llm_bridge import build_normalization_prompt
 from nlu.bert_lab.multitask_infer import predict_multitask
 from nlu.bert_lab.ollama_client import chat, extract_json
-from nlu.bert_lab.postprocess import merge_params
+from nlu.runtime_components.postprocess import merge_params
 
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -24,6 +24,25 @@ def _load_json(path: Path) -> Dict[str, Any]:
 
 
 _CACHE: Dict[str, List[str]] | None = None
+
+
+MATERIAL_ALIASES: Dict[str, str] = {
+    "air": "G4_AIR",
+    "water": "G4_WATER",
+    "silicon": "G4_Si",
+    "si": "G4_Si",
+    "copper": "G4_Cu",
+    "cu": "G4_Cu",
+    "aluminum": "G4_Al",
+    "aluminium": "G4_Al",
+    "al": "G4_Al",
+    "iron": "G4_Fe",
+    "fe": "G4_Fe",
+    "lead": "G4_Pb",
+    "pb": "G4_Pb",
+    "tungsten": "G4_W",
+    "w": "G4_W",
+}
 
 
 def _load_knowledge() -> Dict[str, List[str]]:
@@ -60,6 +79,18 @@ def _match_any(text: str, items: List[str]) -> Optional[str]:
         pat = re.compile(rf"(?<![A-Za-z0-9_]){re.escape(item)}(?![A-Za-z0-9_])", re.IGNORECASE)
         if pat.search(text):
             return item
+    return None
+
+
+def _material_from_text(text: str, known_materials: List[str]) -> Optional[str]:
+    direct = _match_any(text, known_materials)
+    if direct:
+        return direct
+    low = text.lower()
+    for alias, canonical in MATERIAL_ALIASES.items():
+        if re.search(rf"(?<![A-Za-z0-9_]){re.escape(alias)}(?![A-Za-z0-9_])", low):
+            if canonical in known_materials:
+                return canonical
     return None
 
 
@@ -114,10 +145,11 @@ def _normalize_text_with_llm(
     *,
     enable: bool = False,
     config_path: str = "nlu/bert_lab/configs/ollama_config.json",
+    context_summary: str = "",
 ) -> Tuple[str, Dict[str, Any]]:
     if not enable:
         return text, {"enabled": False, "used": False}
-    prompt = build_normalization_prompt(text)
+    prompt = build_normalization_prompt(text, context_summary=context_summary)
     try:
         resp = chat(prompt, config_path=config_path, temperature=0.0)
         parsed = extract_json(resp.get("response", ""))
@@ -162,6 +194,7 @@ def extract_semantic_frame(
     device: str = "auto",
     normalize_with_llm: bool = False,
     normalize_config_path: str = "nlu/bert_lab/configs/ollama_config.json",
+    context_summary: str = "",
 ) -> Tuple[SemanticFrame, Dict[str, Any]]:
     """
     Produce a SemanticFrame from natural language.
@@ -175,6 +208,7 @@ def extract_semantic_frame(
         text,
         enable=normalize_with_llm,
         config_path=normalize_config_path,
+        context_summary=context_summary,
     )
 
     normalization_used = bool(normalize_meta.get("used", False))
@@ -242,8 +276,10 @@ def extract_semantic_frame(
     frame.notes.extend(notes)
 
     knowledge = _load_knowledge()
-    mat = _match_any(mt_entities.get("material", ""), knowledge["materials"]) or _match_any(
-        normalized_text, knowledge["materials"]
+    mat = (
+        _material_from_text(mt_entities.get("material", ""), knowledge["materials"])
+        or _material_from_text(normalized_text, knowledge["materials"])
+        or _material_from_text(text, knowledge["materials"])
     )
     if mat:
         frame.materials.selected_materials.append(mat)
@@ -296,6 +332,7 @@ def extract_semantic_frame(
     debug["inference_backend"] = used_backend
     debug["input_text"] = text
     debug["normalized_text"] = normalized_text
+    debug["context_summary"] = context_summary
     debug["normalization"] = normalize_meta
     debug["normalization_degraded"] = bool(
         normalize_with_llm and not bool(normalize_meta.get("used", False))

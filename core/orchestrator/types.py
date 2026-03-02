@@ -101,3 +101,5 @@ class SessionState:
     question_attempts: dict[str, int] = field(default_factory=dict)
     last_dialogue_action: str = ""
     dialogue_summary: dict[str, Any] = field(default_factory=dict)
+    confirmed_fact_paths: list[str] = field(default_factory=list)
+    dialogue_memory: list[dict[str, Any]] = field(default_factory=list)

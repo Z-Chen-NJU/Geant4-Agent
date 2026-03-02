@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import unittest
 
-from core.dialogue.state import build_dialogue_summary, build_raw_dialogue
+from types import SimpleNamespace
+
+from core.dialogue.state import build_dialogue_summary, build_raw_dialogue, sync_dialogue_state
 from core.dialogue.types import DialogueAction, DialogueDecision
 
 
@@ -30,6 +32,31 @@ class DialogueStateTest(unittest.TestCase):
         self.assertEqual(summary["last_action"], "ask_clarification")
         self.assertIn("source energy", summary["pending_fields"])
         self.assertIn("source energy", summary["next_questions"])
+
+    def test_sync_dialogue_state_accumulates_memory(self) -> None:
+        state = SimpleNamespace(
+            history=[{"role": "user", "content": "set energy"}],
+            dialogue_summary={},
+            confirmed_fact_paths=[],
+            dialogue_memory=[],
+        )
+        decision = DialogueDecision(
+            action=DialogueAction.SUMMARIZE_PROGRESS,
+            updated_paths=["source.energy"],
+            missing_fields=["output.path"],
+            answered_this_turn=["source.energy"],
+            user_intent="SET",
+        )
+        summary, raw_dialogue, memory = sync_dialogue_state(
+            state,
+            decision=decision,
+            lang="en",
+            is_complete=False,
+        )
+        self.assertIn("source energy", summary["recent_confirmed"])
+        self.assertEqual(summary["memory_depth"], 1)
+        self.assertEqual(len(memory), 1)
+        self.assertEqual(raw_dialogue, [{"role": "user", "content": "set energy"}])
 
 
 if __name__ == "__main__":

@@ -33,6 +33,7 @@ def render_dialogue_message(
     use_llm_question: bool,
     ollama_config: str,
     user_temperature: float,
+    dialogue_summary: dict | None = None,
 ) -> str:
     if decision.action == DialogueAction.FINALIZE:
         return completion_message(lang)
@@ -45,6 +46,28 @@ def render_dialogue_message(
                 temperature=user_temperature,
             )
         return clarification_fallback(friendly_labels(decision.asked_fields, lang), lang)
+    if decision.action == DialogueAction.SUMMARIZE_PROGRESS:
+        summary = dialogue_summary or {}
+        updated = summary.get("updated_fields") or friendly_labels(decision.updated_paths[:3], lang)
+        pending = summary.get("pending_fields") or friendly_labels(decision.missing_fields[:2], lang)
+        recent = summary.get("recent_confirmed") or []
+        if lang == "zh":
+            parts: list[str] = []
+            if updated:
+                parts.append(f"\u672c\u8f6e\u5df2\u540c\u6b65\uff1a{', '.join(updated)}\u3002")
+            if recent:
+                parts.append(f"\u5f53\u524d\u5df2\u786e\u8ba4\uff1a{', '.join(recent[:3])}\u3002")
+            if pending:
+                parts.append(f"\u4ecd\u9700\u8865\u5145\uff1a{', '.join(pending[:2])}\u3002")
+            return "".join(parts) or "\u5f53\u524d\u914d\u7f6e\u6b63\u5728\u6536\u655b\u3002"
+        parts = []
+        if updated:
+            parts.append(f"Updated this turn: {', '.join(updated)}.")
+        if recent:
+            parts.append(f"Confirmed so far: {', '.join(recent[:3])}.")
+        if pending:
+            parts.append(f"Still needed: {', '.join(pending[:2])}.")
+        return " ".join(parts) or "Configuration is converging."
     if decision.action in {DialogueAction.CONFIRM_UPDATE, DialogueAction.ANSWER_STATUS}:
         return _render_update_status(decision, lang=lang)
     return completion_message(lang)

@@ -131,6 +131,7 @@
    - `dialogue_action`
    - `dialogue_trace`
    - `dialogue_summary`
+   - `dialogue_memory`
    - `raw_dialogue`
 
 当前对话层定位：
@@ -144,9 +145,15 @@
 
 为了后续报告和回归评估，当前 `strict` 响应中已经显式提供：
 
+- `dialogue_memory`
 - `raw_dialogue`
 
-它是最近若干轮的原始对话记录（`role + content`），用于：
+其中：
+
+- `dialogue_memory`：最近若干轮的结构化对话记忆（动作、更新、待补字段）
+- `raw_dialogue`：最近若干轮的原始对话记录（`role + content`）
+
+用途：
 
 - 展示真实对话链
 - 复盘用户输入与系统输出
@@ -199,6 +206,7 @@
 - 有更新但未完成时：确认更新并提示剩余缺项
 - 配置已完成时：结束语
 - 没有新更新时：返回状态类消息
+- 回答了上一轮追问后：输出阶段性进展总结（`summarize_progress`）
 
 它当前还不能做：
 

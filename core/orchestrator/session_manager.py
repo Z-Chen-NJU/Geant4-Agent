@@ -10,7 +10,7 @@ from core.config.defaults import build_strict_default_config
 from core.config.phase_registry import phase_title
 from core.dialogue.policy import decide_dialogue_action
 from core.dialogue.renderer import render_dialogue_message
-from core.dialogue.state import sync_dialogue_state
+from core.dialogue.state import build_raw_dialogue, sync_dialogue_state
 from core.dialogue.types import build_dialogue_trace
 from core.orchestrator.arbiter import arbitrate_candidates
 from core.orchestrator.candidate_preprocess import (
@@ -439,23 +439,26 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         missing_fields=final_report.missing_required_paths,
         updated_paths=updated_paths,
         answered_this_turn=answered_this_turn,
+        last_dialogue_action=state.last_dialogue_action,
     )
     dialogue_trace = build_dialogue_trace(dialogue_decision)
+    dialogue_summary, _, dialogue_memory = sync_dialogue_state(
+        state,
+        decision=dialogue_decision,
+        lang=lang,
+        is_complete=is_complete,
+    )
     question = render_dialogue_message(
         dialogue_decision,
         lang=lang,
         use_llm_question=llm_question,
         ollama_config=ollama_config_path,
         user_temperature=user_temperature,
+        dialogue_summary=dialogue_summary,
     )
     state.last_dialogue_action = dialogue_decision.action.value
     state.history.append({"role": "assistant", "content": question})
-    dialogue_summary, raw_dialogue = sync_dialogue_state(
-        state,
-        decision=dialogue_decision,
-        lang=lang,
-        is_complete=is_complete,
-    )
+    raw_dialogue = build_raw_dialogue(state.history)
 
     return {
         "session_id": state.session_id,
@@ -464,6 +467,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         "dialogue_action": dialogue_decision.action.value,
         "dialogue_trace": dialogue_trace,
         "dialogue_summary": dialogue_summary,
+        "dialogue_memory": dialogue_memory,
         "raw_dialogue": raw_dialogue,
         "is_complete": is_complete,
         "assistant_message": question,

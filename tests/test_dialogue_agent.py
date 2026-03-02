@@ -30,6 +30,18 @@ class DialogueAgentTest(unittest.TestCase):
         )
         self.assertEqual(decision.action, DialogueAction.ASK_CLARIFICATION)
 
+    def test_policy_summarizes_progress_after_answering_clarification(self) -> None:
+        decision = decide_dialogue_action(
+            user_intent="SET",
+            is_complete=False,
+            asked_fields=[],
+            missing_fields=["output.path"],
+            updated_paths=["source.energy"],
+            answered_this_turn=["source.energy"],
+            last_dialogue_action="ask_clarification",
+        )
+        self.assertEqual(decision.action, DialogueAction.SUMMARIZE_PROGRESS)
+
     def test_renderer_can_emit_non_llm_status_messages(self) -> None:
         decision = decide_dialogue_action(
             user_intent="MODIFY",
@@ -46,8 +58,33 @@ class DialogueAgentTest(unittest.TestCase):
             ollama_config="",
             user_temperature=1.0,
         )
-        self.assertIn("Updated:", msg)
+        self.assertIn("Updated", msg)
         self.assertIn("Still needed:", msg)
+
+    def test_renderer_can_emit_progress_summary(self) -> None:
+        decision = decide_dialogue_action(
+            user_intent="SET",
+            is_complete=False,
+            asked_fields=[],
+            missing_fields=["output.path"],
+            updated_paths=["source.energy"],
+            answered_this_turn=["source.energy"],
+            last_dialogue_action="ask_clarification",
+        )
+        msg = render_dialogue_message(
+            decision,
+            lang="en",
+            use_llm_question=False,
+            ollama_config="",
+            user_temperature=1.0,
+            dialogue_summary={
+                "updated_fields": ["source energy"],
+                "pending_fields": ["output path"],
+                "recent_confirmed": ["source energy", "source direction"],
+            },
+        )
+        self.assertIn("Updated this turn:", msg)
+        self.assertIn("Confirmed so far:", msg)
 
 
 if __name__ == "__main__":

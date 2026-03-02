@@ -6,6 +6,7 @@ from enum import Enum
 
 class DialogueAction(str, Enum):
     ASK_CLARIFICATION = "ask_clarification"
+    SUMMARIZE_PROGRESS = "summarize_progress"
     CONFIRM_UPDATE = "confirm_update"
     ANSWER_STATUS = "answer_status"
     FINALIZE = "finalize"

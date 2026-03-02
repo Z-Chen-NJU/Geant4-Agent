@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from builder.geometry.synthesize import synthesize_from_params
+from core.config.defaults import build_legacy_default_config
 from nlu.bert_lab.llm_bridge import build_missing_params_prompt, build_missing_params_schema
 from nlu.bert_lab.ollama_client import chat, extract_json
 from planner.agent import ask_missing
@@ -93,46 +94,7 @@ def _match_any(text: str, items: List[str]) -> Optional[str]:
 
 
 def _default_config() -> Dict[str, Any]:
-    return {
-        "geometry": {
-            "graph_program": None,
-            "chosen_skeleton": None,
-            "structure": None,
-            "params": {},
-            "dsl": None,
-            "feasible": None,
-            "errors": [],
-        },
-        "materials": {
-            "selected_materials": [],
-            "volume_material_map": {},
-        },
-        "source": {
-            "type": None,
-            "particle": None,
-            "energy": None,
-            "position": None,
-            "direction": None,
-            "selection_source": None,
-            "selection_reasons": [],
-        },
-        "physics": {
-            "physics_list": None,
-            "backup_physics_list": None,
-            "selection_reasons": [],
-            "covered_processes": [],
-            "selection_source": None,
-        },
-        "environment": {
-            "temperature": None,
-            "pressure": None,
-        },
-        "output": {
-            "format": None,
-            "path": None,
-        },
-        "notes": [],
-    }
+    return build_legacy_default_config()
 
 
 def _ensure_session(session_id: Optional[str]) -> Tuple[str, SessionState]:

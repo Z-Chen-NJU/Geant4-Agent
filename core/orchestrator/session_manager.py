@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from core.audit.audit_log import append_audit_entry
+from core.config.defaults import build_strict_default_config
 from core.orchestrator.arbiter import arbitrate_candidates
 from core.orchestrator.candidate_preprocess import (
     drop_updates_shadowed_by_anchor,
@@ -57,40 +58,7 @@ KNOWLEDGE = _load_knowledge()
 
 
 def default_config() -> dict[str, Any]:
-    return {
-        "geometry": {
-            "structure": None,
-            "params": {},
-            "root_name": None,
-            "feasible": None,
-        },
-        "materials": {
-            "selected_materials": [],
-            "volume_material_map": {},
-            "selection_source": None,
-            "selection_reasons": [],
-        },
-        "source": {
-            "type": None,
-            "particle": None,
-            "energy": None,
-            "position": None,
-            "direction": None,
-            "selection_source": None,
-            "selection_reasons": [],
-        },
-        "physics": {
-            "physics_list": None,
-            "backup_physics_list": None,
-            "selection_reasons": [],
-            "covered_processes": [],
-            "selection_source": None,
-        },
-        "output": {
-            "format": None,
-            "path": None,
-        },
-    }
+    return build_strict_default_config()
 
 
 def get_or_create_session(session_id: str | None) -> SessionState:

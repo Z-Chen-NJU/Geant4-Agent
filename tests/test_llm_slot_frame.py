@@ -180,6 +180,38 @@ class LlmSlotFrameTest(unittest.TestCase):
         self.assertEqual(result.frame.geometry.half_length_mm, 50.0)
         self.assertIn("geometry.radius_mm", result.stage_trace.get("raw_text_backfill_fields", []))
 
+    def test_build_llm_slot_frame_backfills_english_source_vectors(self) -> None:
+        llm_payload = {
+            "intent": "SET",
+            "confidence": 0.82,
+            "normalized_text": "geometry.size:1m,1m,1m; materials.primary:copper; source.kind:point; source.particle:gamma",
+            "target_slots": [
+                "geometry.size_triplet_mm",
+                "materials.primary",
+                "source.kind",
+                "source.particle",
+                "source.position_mm",
+                "source.direction_vec",
+            ],
+            "slots": {
+                "geometry": {"kind": "box", "size_triplet_mm": "1 m x 1 m x 1 m"},
+                "materials": {"primary": "copper"},
+                "source": {"kind": "point", "particle": "gamma"},
+            },
+        }
+        with patch("nlu.llm.slot_frame.chat", return_value={"response": json.dumps(llm_payload)}):
+            result = build_llm_slot_frame(
+                "Please set up a 1 m x 1 m x 1 m copper box target with a gamma point source at (0,0,-100) mm pointing (0,0,1).",
+                context_summary="phase=source",
+                config_path="",
+            )
+        self.assertTrue(result.ok)
+        assert result.frame is not None
+        self.assertEqual(result.frame.source.position_mm, [0.0, 0.0, -100.0])
+        self.assertEqual(result.frame.source.direction_vec, [0.0, 0.0, 1.0])
+        self.assertIn("source.position_mm", result.stage_trace.get("raw_text_backfill_fields", []))
+        self.assertIn("source.direction_vec", result.stage_trace.get("raw_text_backfill_fields", []))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -422,6 +422,38 @@ def _geometry_cylinder_from_phrase(text: str) -> tuple[float | None, float | Non
     return radius, half_length
 
 
+def _source_position_from_phrase(text: str) -> list[float] | None:
+    patterns = [
+        r"(?:position(?:ed)?|located)\s*(?:at|=|:)?\s*(\(\s*[-+]?\d*\.?\d+\s*,\s*[-+]?\d*\.?\d+\s*,\s*[-+]?\d*\.?\d+\s*\)\s*(?:mm|cm|m)?)",
+        r"(?:source\s+at|at)\s*(\(\s*[-+]?\d*\.?\d+\s*,\s*[-+]?\d*\.?\d+\s*,\s*[-+]?\d*\.?\d+\s*\)\s*(?:mm|cm|m)?)",
+        r"(?:position|located)\s*(?:at|=|:)?\s*([-+]?\d*\.?\d+\s*,\s*[-+]?\d*\.?\d+\s*,\s*[-+]?\d*\.?\d+\s*(?:mm|cm|m))",
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, text, flags=re.IGNORECASE)
+        if not m:
+            continue
+        vec = _coerce_vec3(m.group(1), metric=True)
+        if vec is not None:
+            return vec
+    return None
+
+
+def _source_direction_from_phrase(text: str) -> list[float] | None:
+    patterns = [
+        r"(?:direction|pointing)\s*(?:=|:)?\s*(\(\s*[-+]?\d*\.?\d+\s*,\s*[-+]?\d*\.?\d+\s*,\s*[-+]?\d*\.?\d+\s*\))",
+        r"(?:direction|pointing)\s*(?:=|:)?\s*([+-][xyz])",
+        r"along\s*(?:the\s*)?([+-][xyz])(?:\s+direction)?",
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, text, flags=re.IGNORECASE)
+        if not m:
+            continue
+        vec = _coerce_vec3(m.group(1), metric=False)
+        if vec is not None:
+            return vec
+    return None
+
+
 def _apply_clause(frame: SlotFrame, key: str, raw_value: str) -> None:
     k = key.strip().lower()
     v = raw_value.strip()
@@ -549,6 +581,16 @@ def _backfill_from_user_text(frame: SlotFrame, user_text: str) -> None:
             if alias in low or alias in text:
                 frame.materials.primary = canonical
                 break
+
+    if frame.source.position_mm is None:
+        position = _source_position_from_phrase(text)
+        if position is not None:
+            frame.source.position_mm = position
+
+    if frame.source.direction_vec is None:
+        direction = _source_direction_from_phrase(text)
+        if direction is not None:
+            frame.source.direction_vec = direction
 
 
 def _coerce_slot_payload(payload: dict[str, Any]) -> tuple[SlotFrame, dict[str, Any]]:

@@ -24,6 +24,14 @@ class NormalizerControlsTest(unittest.TestCase):
         self.assertNotIn("output.path", controls["target_paths"])
         self.assertNotIn("source.position", controls["target_paths"])
 
+    def test_explicit_source_vectors_target_position_and_direction(self) -> None:
+        controls = infer_user_turn_controls(
+            "Please set up a copper box with a gamma point source at (0,0,-100) mm pointing (0,0,1)."
+        )
+        self.assertEqual(controls["intent"], Intent.SET)
+        self.assertIn("source.position", controls["target_paths"])
+        self.assertIn("source.direction", controls["target_paths"])
+
 
 if __name__ == "__main__":
     unittest.main()

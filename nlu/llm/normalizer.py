@@ -58,6 +58,7 @@ _QUESTION_PATTERNS = [
     r"\u80fd\u5426",
     r"\u53ef\u4ee5\u5417",
 ]
+_VECTOR_LITERAL = r"\(\s*[-+0-9.]+\s*,\s*[-+0-9.]+\s*,\s*[-+0-9.]+\s*\)"
 
 
 def _compact(text: str) -> str:
@@ -112,8 +113,12 @@ def _collect_target_paths(payload: str) -> list[str]:
         for keyword in ["half-length", "half length", "half length", "\u534a\u957f", "height", "length", "\u9ad8\u5ea6"]
     ):
         out.append("geometry.params.child_hz")
-    if re.search(r"\(\s*[-+0-9.]+\s*,\s*[-+0-9.]+\s*,\s*[-+0-9.]+\s*\)", low):
+    if re.search(_VECTOR_LITERAL, low):
         if any(keyword in low for keyword in ["position", "origin", "center", "\u4f4d\u7f6e", "\u539f\u70b9", "\u4e2d\u5fc3"]):
+            out.append("source.position")
+        if re.search(rf"(?:located|source\s+at|beam\s+at)\s*{_VECTOR_LITERAL}", low):
+            out.append("source.position")
+        if re.search(rf"\bat\s*{_VECTOR_LITERAL}", low) and any(keyword in low for keyword in ["source", "beam", "point source", "particle source"]):
             out.append("source.position")
         if any(keyword in low for keyword in ["direction", "pointing", "\u65b9\u5411"]):
             out.append("source.direction")

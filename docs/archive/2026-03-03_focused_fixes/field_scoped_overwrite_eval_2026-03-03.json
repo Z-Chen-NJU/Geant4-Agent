@@ -1,0 +1,457 @@
+{
+  "suite": "field_scoped_overwrite_eval",
+  "date": "2026-03-03",
+  "base_url": "http://114.212.130.6:11434",
+  "model": "qwen3:14b",
+  "pass": true,
+  "turns": [
+    {
+      "turn": 1,
+      "user": "Please set up a 1 m x 1 m x 1 m copper box target with a gamma point source at (0,0,-100) mm pointing (0,0,1), physics FTFP_BERT.",
+      "dialogue_action": "summarize_progress",
+      "assistant_message": "Geometry: updated geometry structure, geometry parameter module_x, geometry parameter module_y. Materials: updated materials.selected_materials, volume-to-material binding, materials.selection_source. Source: updated particle type, source type, source.selection_source; still needs source energy, source position. Physics: updated physics list, physics.selection_source, physics.selection_reasons. Output: still needs output format, output path.",
+      "dialogue_trace": {
+        "action": "summarize_progress",
+        "user_intent": "SET",
+        "asked_fields": [],
+        "updated_paths": [
+          "geometry.structure",
+          "geometry.params.module_x",
+          "geometry.params.module_y",
+          "geometry.params.module_z",
+          "materials.selected_materials",
+          "source.particle",
+          "source.type",
+          "physics.physics_list",
+          "source.selection_source",
+          "source.selection_reasons",
+          "geometry.root_name",
+          "materials.volume_material_map",
+          "materials.selection_source",
+          "materials.selection_reasons",
+          "physics.selection_source",
+          "physics.selection_reasons"
+        ],
+        "missing_fields": [
+          "source.energy",
+          "source.position",
+          "source.direction",
+          "output.format",
+          "output.path"
+        ],
+        "answered_this_turn": [
+          "geometry.structure",
+          "geometry.params.module_x",
+          "geometry.params.module_y",
+          "geometry.params.module_z",
+          "materials.volume_material_map",
+          "source.type",
+          "source.particle",
+          "physics.physics_list"
+        ],
+        "overwrite_preview": [],
+        "explanation": {}
+      },
+      "raw_dialogue": [
+        {
+          "role": "user",
+          "content": "Please set up a 1 m x 1 m x 1 m copper box target with a gamma point source at (0,0,-100) mm pointing (0,0,1), physics FTFP_BERT."
+        },
+        {
+          "role": "assistant",
+          "content": "Geometry: updated geometry structure, geometry parameter module_x, geometry parameter module_y. Materials: updated materials.selected_materials, volume-to-material binding, materials.selection_source. Source: updated particle type, source type, source.selection_source; still needs source energy, source position. Physics: updated physics list, physics.selection_source, physics.selection_reasons. Output: still needs output format, output path."
+        }
+      ],
+      "config": {
+        "geometry": {
+          "structure": "single_box",
+          "params": {
+            "module_x": 1000.0,
+            "module_y": 1000.0,
+            "module_z": 1000.0
+          },
+          "feasible": null,
+          "root_name": "box"
+        },
+        "materials": {
+          "selected_materials": [
+            "G4_Cu"
+          ],
+          "volume_material_map": {
+            "box": "G4_Cu"
+          },
+          "selection_source": "explicit_request",
+          "selection_reasons": [
+            "Material provided explicitly by user or extracted semantics."
+          ]
+        },
+        "source": {
+          "type": "point",
+          "particle": "gamma",
+          "energy": null,
+          "position": null,
+          "direction": null,
+          "selection_source": "explicit_request",
+          "selection_reasons": [
+            "Source parameters provided explicitly by user or extracted semantics."
+          ]
+        },
+        "physics": {
+          "physics_list": "FTFP_BERT",
+          "backup_physics_list": null,
+          "selection_reasons": [
+            "Physics list provided explicitly by user or extracted semantics."
+          ],
+          "covered_processes": [],
+          "selection_source": "explicit_request"
+        },
+        "output": {
+          "format": null,
+          "path": null
+        }
+      },
+      "missing_fields": [
+        "source.energy",
+        "source.position",
+        "source.direction",
+        "output.format",
+        "output.path"
+      ],
+      "inference_backend": "runtime_semantic"
+    },
+    {
+      "turn": 2,
+      "user": "change material to G4_Al",
+      "dialogue_action": "confirm_overwrite",
+      "assistant_message": "An existing confirmed value would be overwritten. Please confirm whether to apply this change: materials.selected_materials: ['G4_Cu'] -> ['G4_Al'].",
+      "dialogue_trace": {
+        "action": "confirm_overwrite",
+        "user_intent": "MODIFY",
+        "asked_fields": [],
+        "updated_paths": [],
+        "missing_fields": [
+          "source.energy",
+          "source.position",
+          "source.direction",
+          "output.format",
+          "output.path"
+        ],
+        "answered_this_turn": [],
+        "overwrite_preview": [
+          {
+            "path": "materials.selected_materials",
+            "field": "materials.selected_materials",
+            "old": [
+              "G4_Cu"
+            ],
+            "new": [
+              "G4_Al"
+            ],
+            "producer": "bert_extractor"
+          }
+        ],
+        "explanation": {}
+      },
+      "raw_dialogue": [
+        {
+          "role": "user",
+          "content": "Please set up a 1 m x 1 m x 1 m copper box target with a gamma point source at (0,0,-100) mm pointing (0,0,1), physics FTFP_BERT."
+        },
+        {
+          "role": "assistant",
+          "content": "Geometry: updated geometry structure, geometry parameter module_x, geometry parameter module_y. Materials: updated materials.selected_materials, volume-to-material binding, materials.selection_source. Source: updated particle type, source type, source.selection_source; still needs source energy, source position. Physics: updated physics list, physics.selection_source, physics.selection_reasons. Output: still needs output format, output path."
+        },
+        {
+          "role": "user",
+          "content": "change material to G4_Al"
+        },
+        {
+          "role": "assistant",
+          "content": "An existing confirmed value would be overwritten. Please confirm whether to apply this change: materials.selected_materials: ['G4_Cu'] -> ['G4_Al']."
+        }
+      ],
+      "config": {
+        "geometry": {
+          "structure": "single_box",
+          "params": {
+            "module_x": 1000.0,
+            "module_y": 1000.0,
+            "module_z": 1000.0
+          },
+          "feasible": null,
+          "root_name": "box"
+        },
+        "materials": {
+          "selected_materials": [
+            "G4_Cu"
+          ],
+          "volume_material_map": {
+            "box": "G4_Cu"
+          },
+          "selection_source": "explicit_request",
+          "selection_reasons": [
+            "Material provided explicitly by user or extracted semantics."
+          ]
+        },
+        "source": {
+          "type": "point",
+          "particle": "gamma",
+          "energy": null,
+          "position": null,
+          "direction": null,
+          "selection_source": "explicit_request",
+          "selection_reasons": [
+            "Source parameters provided explicitly by user or extracted semantics."
+          ]
+        },
+        "physics": {
+          "physics_list": "FTFP_BERT",
+          "backup_physics_list": null,
+          "selection_reasons": [
+            "Physics list provided explicitly by user or extracted semantics."
+          ],
+          "covered_processes": [],
+          "selection_source": "explicit_request"
+        },
+        "output": {
+          "format": null,
+          "path": null
+        }
+      },
+      "missing_fields": [
+        "source.energy",
+        "source.position",
+        "source.direction",
+        "output.format",
+        "output.path"
+      ],
+      "inference_backend": "runtime_semantic"
+    },
+    {
+      "turn": 3,
+      "user": "Output json.",
+      "dialogue_action": "confirm_overwrite",
+      "assistant_message": "An existing confirmed value would be overwritten. Please confirm whether to apply this change: materials.selected_materials: ['G4_Cu'] -> ['G4_Al'].",
+      "dialogue_trace": {
+        "action": "confirm_overwrite",
+        "user_intent": "SET",
+        "asked_fields": [],
+        "updated_paths": [],
+        "missing_fields": [
+          "source.energy",
+          "source.position",
+          "source.direction"
+        ],
+        "answered_this_turn": [
+          "output.format",
+          "output.path"
+        ],
+        "overwrite_preview": [
+          {
+            "path": "materials.selected_materials",
+            "field": "materials.selected_materials",
+            "old": [
+              "G4_Cu"
+            ],
+            "new": [
+              "G4_Al"
+            ],
+            "producer": "bert_extractor"
+          }
+        ],
+        "explanation": {}
+      },
+      "raw_dialogue": [
+        {
+          "role": "user",
+          "content": "Please set up a 1 m x 1 m x 1 m copper box target with a gamma point source at (0,0,-100) mm pointing (0,0,1), physics FTFP_BERT."
+        },
+        {
+          "role": "assistant",
+          "content": "Geometry: updated geometry structure, geometry parameter module_x, geometry parameter module_y. Materials: updated materials.selected_materials, volume-to-material binding, materials.selection_source. Source: updated particle type, source type, source.selection_source; still needs source energy, source position. Physics: updated physics list, physics.selection_source, physics.selection_reasons. Output: still needs output format, output path."
+        },
+        {
+          "role": "user",
+          "content": "change material to G4_Al"
+        },
+        {
+          "role": "assistant",
+          "content": "An existing confirmed value would be overwritten. Please confirm whether to apply this change: materials.selected_materials: ['G4_Cu'] -> ['G4_Al']."
+        },
+        {
+          "role": "user",
+          "content": "Output json."
+        },
+        {
+          "role": "assistant",
+          "content": "An existing confirmed value would be overwritten. Please confirm whether to apply this change: materials.selected_materials: ['G4_Cu'] -> ['G4_Al']."
+        }
+      ],
+      "config": {
+        "geometry": {
+          "structure": "single_box",
+          "params": {
+            "module_x": 1000.0,
+            "module_y": 1000.0,
+            "module_z": 1000.0
+          },
+          "feasible": null,
+          "root_name": "box"
+        },
+        "materials": {
+          "selected_materials": [
+            "G4_Cu"
+          ],
+          "volume_material_map": {
+            "box": "G4_Cu"
+          },
+          "selection_source": "explicit_request",
+          "selection_reasons": [
+            "Material provided explicitly by user or extracted semantics."
+          ]
+        },
+        "source": {
+          "type": "point",
+          "particle": "gamma",
+          "energy": null,
+          "position": null,
+          "direction": null,
+          "selection_source": "explicit_request",
+          "selection_reasons": [
+            "Source parameters provided explicitly by user or extracted semantics."
+          ]
+        },
+        "physics": {
+          "physics_list": "FTFP_BERT",
+          "backup_physics_list": null,
+          "selection_reasons": [
+            "Physics list provided explicitly by user or extracted semantics."
+          ],
+          "covered_processes": [],
+          "selection_source": "explicit_request"
+        },
+        "output": {
+          "format": "json",
+          "path": "output/result.json"
+        }
+      },
+      "missing_fields": [
+        "source.energy",
+        "source.position",
+        "source.direction"
+      ],
+      "inference_backend": "runtime_semantic"
+    },
+    {
+      "turn": 4,
+      "user": "confirm",
+      "dialogue_action": "summarize_progress",
+      "assistant_message": "Geometry: confirmed geometry.root_name. Materials: updated materials.selected_materials, volume-to-material binding. Source: confirmed source.selection_reasons, source.selection_source; still needs source energy, source position. Physics: confirmed physics.selection_reasons, physics.selection_source. Output: confirmed output path, output format.",
+      "dialogue_trace": {
+        "action": "summarize_progress",
+        "user_intent": "CONFIRM",
+        "asked_fields": [],
+        "updated_paths": [
+          "materials.selected_materials",
+          "materials.volume_material_map"
+        ],
+        "missing_fields": [
+          "source.energy",
+          "source.position",
+          "source.direction"
+        ],
+        "answered_this_turn": [],
+        "overwrite_preview": [],
+        "explanation": {}
+      },
+      "raw_dialogue": [
+        {
+          "role": "user",
+          "content": "Please set up a 1 m x 1 m x 1 m copper box target with a gamma point source at (0,0,-100) mm pointing (0,0,1), physics FTFP_BERT."
+        },
+        {
+          "role": "assistant",
+          "content": "Geometry: updated geometry structure, geometry parameter module_x, geometry parameter module_y. Materials: updated materials.selected_materials, volume-to-material binding, materials.selection_source. Source: updated particle type, source type, source.selection_source; still needs source energy, source position. Physics: updated physics list, physics.selection_source, physics.selection_reasons. Output: still needs output format, output path."
+        },
+        {
+          "role": "user",
+          "content": "change material to G4_Al"
+        },
+        {
+          "role": "assistant",
+          "content": "An existing confirmed value would be overwritten. Please confirm whether to apply this change: materials.selected_materials: ['G4_Cu'] -> ['G4_Al']."
+        },
+        {
+          "role": "user",
+          "content": "Output json."
+        },
+        {
+          "role": "assistant",
+          "content": "An existing confirmed value would be overwritten. Please confirm whether to apply this change: materials.selected_materials: ['G4_Cu'] -> ['G4_Al']."
+        },
+        {
+          "role": "user",
+          "content": "confirm"
+        },
+        {
+          "role": "assistant",
+          "content": "Geometry: confirmed geometry.root_name. Materials: updated materials.selected_materials, volume-to-material binding. Source: confirmed source.selection_reasons, source.selection_source; still needs source energy, source position. Physics: confirmed physics.selection_reasons, physics.selection_source. Output: confirmed output path, output format."
+        }
+      ],
+      "config": {
+        "geometry": {
+          "structure": "single_box",
+          "params": {
+            "module_x": 1000.0,
+            "module_y": 1000.0,
+            "module_z": 1000.0
+          },
+          "feasible": null,
+          "root_name": "box"
+        },
+        "materials": {
+          "selected_materials": [
+            "G4_Al"
+          ],
+          "volume_material_map": {
+            "box": "G4_Al"
+          },
+          "selection_source": "explicit_request",
+          "selection_reasons": [
+            "Material provided explicitly by user or extracted semantics."
+          ]
+        },
+        "source": {
+          "type": "point",
+          "particle": "gamma",
+          "energy": null,
+          "position": null,
+          "direction": null,
+          "selection_source": "explicit_request",
+          "selection_reasons": [
+            "Source parameters provided explicitly by user or extracted semantics."
+          ]
+        },
+        "physics": {
+          "physics_list": "FTFP_BERT",
+          "backup_physics_list": null,
+          "selection_reasons": [
+            "Physics list provided explicitly by user or extracted semantics."
+          ],
+          "covered_processes": [],
+          "selection_source": "explicit_request"
+        },
+        "output": {
+          "format": "json",
+          "path": "output/result.json"
+        }
+      },
+      "missing_fields": [
+        "source.energy",
+        "source.position",
+        "source.direction"
+      ],
+      "inference_backend": "runtime_semantic+confirmed_pending_overwrite"
+    }
+  ]
+}

@@ -30,10 +30,7 @@ def decide_dialogue_action(
         for key, value in available_explanations.items()
         if isinstance(value, dict) and (value.get("source") or value.get("reasons"))
     }
-    should_explain = bool(explainable_sources) and not asked_fields and (
-        user_intent == "QUESTION"
-        or any(str(value.get("source", "")) not in {"", "explicit_request"} for value in explainable_sources.values())
-    )
+    should_explain = bool(explainable_sources) and user_intent == "QUESTION" and not asked_fields and not updated_paths
     if should_explain:
         return DialogueDecision(
             action=DialogueAction.EXPLAIN_CHOICE,
@@ -41,6 +38,18 @@ def decide_dialogue_action(
             missing_fields=list(missing_fields),
             answered_this_turn=list(answered_this_turn),
             explanation=explainable_sources,
+            user_intent=user_intent,
+        )
+    if updated_paths and missing_fields and (
+        answered_this_turn
+        or last_dialogue_action == DialogueAction.ASK_CLARIFICATION.value
+        or len(updated_paths) > 1
+    ):
+        return DialogueDecision(
+            action=DialogueAction.SUMMARIZE_PROGRESS,
+            updated_paths=list(updated_paths),
+            missing_fields=list(missing_fields),
+            answered_this_turn=list(answered_this_turn),
             user_intent=user_intent,
         )
     if is_complete:
@@ -61,18 +70,6 @@ def decide_dialogue_action(
             user_intent=user_intent,
         )
     if updated_paths:
-        if missing_fields and (
-            answered_this_turn
-            or last_dialogue_action == DialogueAction.ASK_CLARIFICATION.value
-            or len(updated_paths) > 1
-        ):
-            return DialogueDecision(
-                action=DialogueAction.SUMMARIZE_PROGRESS,
-                updated_paths=list(updated_paths),
-                missing_fields=list(missing_fields),
-                answered_this_turn=list(answered_this_turn),
-                user_intent=user_intent,
-            )
         return DialogueDecision(
             action=DialogueAction.CONFIRM_UPDATE,
             updated_paths=list(updated_paths),

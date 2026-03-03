@@ -21,32 +21,124 @@ _TARGET_HINTS = {
     "source.direction": ["direction", "+z", "-z", "+x", "-x", "+y", "-y", "方向"],
     "physics.physics_list": ["physics list", "物理列表", "ftfp", "qgsp", "qbbc", "shielding"],
     "output.format": ["output format", "root", "json", "csv", "输出格式"],
-    "output.path": ["output path", ".root", ".json", ".csv", "输出路径"],
+    "output.path": ["output path", "output/result", "输出路径", "保存到", "写到", "file", "filename"],
 }
 
 
+_CONFIRM_PATTERNS = [
+    r"^\s*(?:yes[, ]*)?(?:confirm|apply it|go ahead|approved?)\s*[.!?]?\s*$",
+    r"^\s*(?:\u662f\u7684[,\uFF0C ]*)?(?:\u786e\u8ba4(?:\u4fee\u6539|\u8986\u76d6)?|\u597d\u7684[,\uFF0C ]*\u786e\u8ba4)\s*[\u3002\uFF01\uFF1F.!?]?\s*$",
+]
+_MODIFY_PATTERNS = [
+    r"\b(?:change|switch|update|replace)\b",
+    r"\bset\b.+\bto\b",
+    r"\buse\b.+\binstead\b",
+    r"\u6539\u6210",
+    r"\u6539\u4e3a",
+    r"\u628a.+?\u6539\u6210",
+    r"\u628a.+?\u6539\u4e3a",
+    r"\u66ff\u6362\u4e3a",
+    r"\u6362\u6210",
+]
+_REMOVE_PATTERNS = [
+    r"\b(?:remove|clear|delete|unset)\b",
+    r"\u5220\u9664",
+    r"\u79fb\u9664",
+    r"\u6e05\u7a7a",
+]
+_QUESTION_PATTERNS = [
+    r"[?？]",
+    r"\b(?:why|reason|how|what|which|can you|could you|please explain)\b",
+    r"\u4e3a\u4ec0\u4e48",
+    r"\u7406\u7531",
+    r"\u539f\u56e0",
+    r"\u600e\u4e48",
+    r"\u5982\u4f55",
+    r"\u662f\u5426",
+    r"\u80fd\u5426",
+    r"\u53ef\u4ee5\u5417",
+]
+
+
+def _compact(text: str) -> str:
+    return re.sub(r"\s+", " ", text or "").strip()
+
+
+def _matches_any(text: str, patterns: list[str]) -> bool:
+    return any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in patterns)
+
+
 def _infer_intent(text: str) -> Intent:
-    low = text.lower()
-    if any(k in low for k in ["改", "修改", "change", "switch", "update", "set", "设为"]):
-        return Intent.MODIFY
-    if any(k in low for k in ["删除", "remove", "清空"]):
-        return Intent.REMOVE
-    if any(k in low for k in ["确认", "对吗", "is it", "confirm"]):
+    compact = _compact(text)
+    if _matches_any(compact, _CONFIRM_PATTERNS):
         return Intent.CONFIRM
-    if "?" in text or "？" in text:
+    if _matches_any(compact, _MODIFY_PATTERNS):
+        return Intent.MODIFY
+    if _matches_any(compact, _REMOVE_PATTERNS):
+        return Intent.REMOVE
+    if _matches_any(compact, _QUESTION_PATTERNS):
         return Intent.QUESTION
     return Intent.SET
 
 
-def _infer_target_paths(text: str, normalized_text: str) -> list[str]:
-    payload = (text + " ; " + normalized_text).lower()
+def _collect_target_paths(payload: str) -> list[str]:
+    low = _compact(payload).lower()
+    if not low:
+        return []
     out: list[str] = []
     for path, hints in _TARGET_HINTS.items():
-        if any(h.lower() in payload for h in hints):
+        if any(h.lower() in low for h in hints):
             out.append(path)
-    if not out:
-        out.append("geometry.structure")
+    if "pointing" in low or re.search(r"\balong\s*[+-]?[xyz]\b", low):
+        out.append("source.direction")
+    if (
+        re.search(r"\b\d+(?:\.\d+)?\s*(?:mm|cm|m)\s*(?:x|by)\s*\d+(?:\.\d+)?\s*(?:mm|cm|m)\s*(?:x|by)\s*\d+(?:\.\d+)?\s*(?:mm|cm|m)\b", low)
+        or "\u89c1\u65b9" in low
+        or "\u8fb9\u957f" in low
+        or "side length" in low
+    ):
+        out.extend(
+            [
+                "geometry.structure",
+                "geometry.params.module_x",
+                "geometry.params.module_y",
+                "geometry.params.module_z",
+            ]
+        )
+    if any(keyword in low for keyword in ["radius", "diameter", "\u534a\u5f84"]):
+        out.append("geometry.params.child_rmax")
+    if any(
+        keyword in low
+        for keyword in ["half-length", "half length", "half length", "\u534a\u957f", "height", "length", "\u9ad8\u5ea6"]
+    ):
+        out.append("geometry.params.child_hz")
+    if re.search(r"\(\s*[-+0-9.]+\s*,\s*[-+0-9.]+\s*,\s*[-+0-9.]+\s*\)", low):
+        if any(keyword in low for keyword in ["position", "origin", "center", "\u4f4d\u7f6e", "\u539f\u70b9", "\u4e2d\u5fc3"]):
+            out.append("source.position")
+        if any(keyword in low for keyword in ["direction", "pointing", "\u65b9\u5411"]):
+            out.append("source.direction")
     return sorted(set(out))
+
+
+def _infer_target_paths(text: str, normalized_text: str = "") -> list[str]:
+    out = _collect_target_paths(text)
+    if out:
+        return out
+    if normalized_text:
+        return _collect_target_paths(normalized_text)
+    return []
+
+
+def infer_user_turn_controls(user_text: str) -> dict[str, Any]:
+    intent = _infer_intent(user_text)
+    if intent == Intent.CONFIRM:
+        target_paths: list[str] = []
+    else:
+        target_paths = _infer_target_paths(user_text)
+    return {
+        "intent": intent,
+        "target_paths": target_paths,
+    }
 
 
 def normalize_user_turn(
@@ -54,6 +146,7 @@ def normalize_user_turn(
     context_summary: str,
     config_path: str,
 ) -> dict[str, Any]:
+    controls = infer_user_turn_controls(user_text)
     prompt = build_normalization_prompt(user_text, context_summary=context_summary)
     normalized_text = ""
     structure_hint = ""
@@ -72,9 +165,8 @@ def normalize_user_turn(
         normalized_text = user_text
         confidence = 0.4
 
-    intent = _infer_intent(user_text)
-    target_paths = _infer_target_paths(user_text, normalized_text)
-    # Protect against ambiguous turns that should not rewrite locked fields.
+    intent = controls["intent"]
+    target_paths = controls["target_paths"] or _infer_target_paths(user_text, normalized_text)
     if re.search(r"\b(为什么|why|reason|理由)\b", user_text.lower()):
         intent = Intent.QUESTION
     return {

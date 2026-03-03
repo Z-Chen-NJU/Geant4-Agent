@@ -45,10 +45,10 @@ class DialogueAgentTest(unittest.TestCase):
     def test_policy_can_explain_choice_for_question_intent(self) -> None:
         decision = decide_dialogue_action(
             user_intent="QUESTION",
-            is_complete=False,
+            is_complete=True,
             asked_fields=[],
             missing_fields=[],
-            updated_paths=["physics.physics_list"],
+            updated_paths=[],
             answered_this_turn=[],
             available_explanations={
                 "physics": {
@@ -98,10 +98,10 @@ class DialogueAgentTest(unittest.TestCase):
     def test_renderer_can_explain_choice(self) -> None:
         decision = decide_dialogue_action(
             user_intent="QUESTION",
-            is_complete=False,
+            is_complete=True,
             asked_fields=[],
             missing_fields=[],
-            updated_paths=["physics.physics_list"],
+            updated_paths=[],
             answered_this_turn=[],
             available_explanations={
                 "physics": {
@@ -122,6 +122,25 @@ class DialogueAgentTest(unittest.TestCase):
         self.assertIn("Physics:", msg)
         self.assertIn("Source: llm_recommender.", msg)
         self.assertIn("Reason:", msg)
+
+    def test_policy_does_not_explain_when_question_turn_also_updates(self) -> None:
+        decision = decide_dialogue_action(
+            user_intent="QUESTION",
+            is_complete=False,
+            asked_fields=[],
+            missing_fields=[],
+            updated_paths=["physics.physics_list"],
+            answered_this_turn=[],
+            available_explanations={
+                "physics": {
+                    "label": "Physics",
+                    "field": "physics list",
+                    "source": "llm_recommender",
+                    "reasons": ["Selected for gamma attenuation coverage."],
+                }
+            },
+        )
+        self.assertEqual(decision.action, DialogueAction.CONFIRM_UPDATE)
 
     def test_renderer_can_emit_non_llm_status_messages(self) -> None:
         decision = decide_dialogue_action(

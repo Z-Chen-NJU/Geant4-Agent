@@ -16,7 +16,7 @@ from core.dialogue.types import build_dialogue_trace
 from core.orchestrator.arbiter import arbitrate_candidates
 from core.orchestrator.candidate_preprocess import (
     drop_updates_shadowed_by_anchor,
-    filter_candidate_by_target_scopes,
+    filter_candidate_by_explicit_targets,
 )
 from core.orchestrator.constraint_ledger import lock_from_candidate
 from core.orchestrator.path_ops import deep_copy, get_path, set_path
@@ -37,7 +37,7 @@ from core.validation.validator_gate import (
 from nlu.bert.extractor import extract_candidates_from_normalized_text
 from nlu.llm.slot_frame import build_llm_slot_frame
 from nlu.llm.semantic_frame import build_llm_semantic_frame
-from nlu.llm.normalizer import normalize_user_turn
+from nlu.llm.normalizer import infer_user_turn_controls, normalize_user_turn
 from nlu.llm.recommender import recommend_physics_list
 from planner.question_planner import (
     advance_question_state,
@@ -124,6 +124,34 @@ def _is_unset_for_overwrite(value: Any) -> bool:
     if isinstance(value, (list, dict)) and len(value) == 0:
         return True
     return False
+
+
+def _apply_explicit_user_controls(
+    user_candidate: CandidateUpdate,
+    explicit_controls: dict[str, Any],
+) -> CandidateUpdate:
+    explicit_intent = explicit_controls.get("intent", user_candidate.intent)
+    explicit_targets = [
+        str(path)
+        for path in explicit_controls.get("target_paths", [])
+        if isinstance(path, str) and path
+    ]
+    intent = user_candidate.intent
+    if explicit_intent in {Intent.CONFIRM, Intent.MODIFY, Intent.REMOVE, Intent.QUESTION}:
+        intent = explicit_intent
+    elif user_candidate.intent == Intent.OTHER:
+        intent = explicit_intent
+    target_paths = explicit_targets or list(user_candidate.target_paths)
+    if intent == user_candidate.intent and target_paths == list(user_candidate.target_paths):
+        return user_candidate
+    return CandidateUpdate(
+        producer=user_candidate.producer,
+        intent=intent,
+        target_paths=target_paths,
+        updates=list(user_candidate.updates),
+        confidence=user_candidate.confidence,
+        rationale=f"{user_candidate.rationale}_explicit_controls",
+    )
 
 
 def _enforce_no_implicit_overwrite(
@@ -270,6 +298,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
     applying_pending_overwrite = False
     confirmation_gate_active = False
     staged_pending_overwrite: list[dict[str, Any]] = []
+    explicit_controls = infer_user_turn_controls(text)
 
     if enable_llm_first:
         slot_result = build_llm_slot_frame(
@@ -279,6 +308,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         )
         if slot_result.ok and slot_result.frame:
             slot_candidate, user_candidate = slot_frame_to_candidates(slot_result.frame, turn_id=state.turn_id)
+            user_candidate = _apply_explicit_user_controls(user_candidate, explicit_controls)
             normalized_text = slot_result.normalized_text or text
             slot_debug = dict(slot_result.stage_trace or {})
             slot_debug.setdefault("final_status", "ok")
@@ -290,8 +320,10 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
                 context_summary=context_summary,
                 config_path=ollama_config_path,
             )
+            if slot_candidate is not None:
+                slot_candidate = filter_candidate_by_explicit_targets(slot_candidate, list(user_candidate.target_paths))
             if user_candidate.target_paths:
-                extracted_candidate = filter_candidate_by_target_scopes(extracted_candidate, list(user_candidate.target_paths))
+                extracted_candidate = filter_candidate_by_explicit_targets(extracted_candidate, list(user_candidate.target_paths))
             extracted_candidate = drop_updates_shadowed_by_anchor(extracted_candidate, slot_candidate)
             if slot_candidate is not None and slot_candidate.updates:
                 content_candidates.append(slot_candidate)
@@ -318,7 +350,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
                 turn_id=state.turn_id,
             )
             if semantic_result.ok and semantic_result.candidate and semantic_result.user_candidate:
-                user_candidate = semantic_result.user_candidate
+                user_candidate = _apply_explicit_user_controls(semantic_result.user_candidate, explicit_controls)
                 normalized_text = semantic_result.normalized_text or text
                 extracted_candidate, debug = extract_candidates_from_normalized_text(
                     normalized_text,
@@ -328,11 +360,15 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
                     context_summary=context_summary,
                     config_path=ollama_config_path,
                 )
+                semantic_candidate = filter_candidate_by_explicit_targets(
+                    semantic_result.candidate,
+                    list(user_candidate.target_paths),
+                )
                 if user_candidate.target_paths:
-                    extracted_candidate = filter_candidate_by_target_scopes(extracted_candidate, list(user_candidate.target_paths))
-                extracted_candidate = drop_updates_shadowed_by_anchor(extracted_candidate, semantic_result.candidate)
-                if semantic_result.candidate.updates:
-                    content_candidates.append(semantic_result.candidate)
+                    extracted_candidate = filter_candidate_by_explicit_targets(extracted_candidate, list(user_candidate.target_paths))
+                extracted_candidate = drop_updates_shadowed_by_anchor(extracted_candidate, semantic_candidate)
+                if semantic_candidate.updates:
+                    content_candidates.append(semantic_candidate)
                 if extracted_candidate.updates:
                     content_candidates.append(extracted_candidate)
                 llm_used = True
@@ -373,7 +409,9 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
             config_path=ollama_config_path,
         )
         normalized_text = norm["normalized_text"]
-        content_candidates = [primary_candidate]
+        content_candidates = [
+            filter_candidate_by_explicit_targets(primary_candidate, list(user_candidate.target_paths))
+        ]
         normalization_payload = {
             "intent": norm["intent"].value,
             "confidence": norm["confidence"],
@@ -401,9 +439,9 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
             staged_pending_overwrite = list(state.pending_overwrite)
             content_candidates = []
 
-    if not confirmation_gate_active and get_path(draft.config, "geometry.structure") is not None:
+    if not confirmation_gate_active and user_candidate.target_paths:
         content_candidates = [
-            filter_candidate_by_target_scopes(candidate, list(user_candidate.target_paths))
+            filter_candidate_by_explicit_targets(candidate, list(user_candidate.target_paths))
             for candidate in content_candidates
         ]
 

@@ -57,7 +57,7 @@ class SmokeNoOllamaTest(unittest.TestCase):
         self.assertIn("llm_stage_failures", out)
         self.assertEqual(out.get("inference_backend"), "runtime_semantic")
         self.assertFalse(out.get("is_complete", False))
-        self.assertEqual(out.get("dialogue_action"), "ask_clarification")
+        self.assertEqual(out.get("dialogue_action"), "summarize_progress")
         self.assertEqual(out.get("dialogue_summary", {}).get("status"), "pending")
         self.assertGreaterEqual(len(out.get("dialogue_memory", [])), 1)
         self.assertGreaterEqual(len(out.get("raw_dialogue", [])), 2)
@@ -225,6 +225,78 @@ class SmokeNoOllamaTest(unittest.TestCase):
             fourth.get("config", {}).get("materials", {}).get("volume_material_map"),
             {"box": "G4_Al"},
         )
+
+    def test_chinese_confirmation_turn_is_recognized(self) -> None:
+        first = step(
+            {
+                "text": "1m x 1m x 1m copper box target with gamma source",
+                "lang": "en",
+                "llm_router": False,
+                "llm_question": False,
+                "normalize_input": False,
+                "autofix": True,
+            }
+        )
+        sid = first["session_id"]
+
+        second = step(
+            {
+                "session_id": sid,
+                "text": "把材料改成G4_Al。",
+                "lang": "zh",
+                "llm_router": False,
+                "llm_question": False,
+                "normalize_input": False,
+                "autofix": True,
+            }
+        )
+        self.assertEqual(second.get("dialogue_action"), "confirm_overwrite")
+        self.assertEqual(second.get("config", {}).get("materials", {}).get("selected_materials", []), ["G4_Cu"])
+
+        third = step(
+            {
+                "session_id": sid,
+                "text": "确认",
+                "lang": "zh",
+                "llm_router": False,
+                "llm_question": False,
+                "normalize_input": False,
+                "autofix": True,
+            }
+        )
+        self.assertEqual(third.get("config", {}).get("materials", {}).get("selected_materials", []), ["G4_Al"])
+
+    def test_narrow_output_turn_does_not_trigger_unrelated_overwrite(self) -> None:
+        first = step(
+            {
+                "text": "1m x 1m x 1m copper box target, gamma point source, energy 1 MeV, position (0,0,-20), direction (0,0,1), physics FTFP_BERT",
+                "lang": "en",
+                "llm_router": False,
+                "llm_question": False,
+                "normalize_input": False,
+                "autofix": True,
+            }
+        )
+        sid = first["session_id"]
+
+        second = step(
+            {
+                "session_id": sid,
+                "text": "Output json.",
+                "lang": "en",
+                "llm_router": False,
+                "llm_question": False,
+                "normalize_input": False,
+                "autofix": True,
+            }
+        )
+        self.assertNotEqual(second.get("dialogue_action"), "confirm_overwrite")
+        self.assertEqual(second.get("dialogue_trace", {}).get("overwrite_preview", []), [])
+        self.assertEqual(
+            second.get("config", {}).get("source", {}).get("position"),
+            {"type": "vector", "value": [0.0, 0.0, -20.0]},
+        )
+        self.assertEqual(second.get("config", {}).get("output", {}).get("format"), "json")
 
     def test_llm_slot_first_bridges_into_runtime_extractor(self) -> None:
         sid = "llm-slot-bridge-test"
@@ -398,7 +470,7 @@ class SmokeNoOllamaTest(unittest.TestCase):
         semantic_mock.assert_not_called()
         rejected_paths = {(x.get("path"), x.get("producer")) for x in out.get("rejected_updates", [])}
         self.assertNotIn(("geometry.params.module_x", "bert_extractor"), rejected_paths)
-        self.assertEqual(out.get("config", {}).get("source", {}).get("energy"), 1.0)
+        self.assertIsNone(out.get("config", {}).get("source", {}).get("energy"))
 
 
 if __name__ == "__main__":

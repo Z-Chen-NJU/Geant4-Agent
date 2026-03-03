@@ -26,6 +26,24 @@ def _render_update_status(decision: DialogueDecision, *, lang: str) -> str:
     return "Configuration state synchronized."
 
 
+def _render_overwrite_confirmation(decision: DialogueDecision, *, lang: str) -> str:
+    preview = decision.overwrite_preview[:2]
+    parts: list[str] = []
+    for item in preview:
+        field = item.get("field", item.get("path", ""))
+        old_value = item.get("old")
+        new_value = item.get("new")
+        parts.append(f"{field}: {old_value} -> {new_value}")
+    if lang == "zh":
+        detail = "\uff1b".join(parts)
+        return (
+            f"\u68c0\u6d4b\u5230\u5c06\u8986\u76d6\u5df2\u786e\u8ba4\u7684\u5185\u5bb9\u3002"
+            f"\u8bf7\u786e\u8ba4\u662f\u5426\u5e94\u7528\u4ee5\u4e0b\u4fee\u6539\uff1a{detail}\u3002"
+        )
+    detail = "; ".join(parts)
+    return f"An existing confirmed value would be overwritten. Please confirm whether to apply this change: {detail}."
+
+
 def render_dialogue_message(
     decision: DialogueDecision,
     *,
@@ -37,6 +55,8 @@ def render_dialogue_message(
 ) -> str:
     if decision.action == DialogueAction.FINALIZE:
         return completion_message(lang)
+    if decision.action == DialogueAction.CONFIRM_OVERWRITE:
+        return _render_overwrite_confirmation(decision, lang=lang)
     if decision.action == DialogueAction.ASK_CLARIFICATION:
         if use_llm_question:
             return render_question(

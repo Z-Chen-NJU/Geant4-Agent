@@ -11,8 +11,18 @@ def decide_dialogue_action(
     missing_fields: list[str],
     updated_paths: list[str],
     answered_this_turn: list[str],
+    pending_overwrite_preview: list[dict] | None = None,
     last_dialogue_action: str = "",
 ) -> DialogueDecision:
+    pending_overwrite_preview = list(pending_overwrite_preview or [])
+    if pending_overwrite_preview:
+        return DialogueDecision(
+            action=DialogueAction.CONFIRM_OVERWRITE,
+            missing_fields=list(missing_fields),
+            answered_this_turn=list(answered_this_turn),
+            overwrite_preview=pending_overwrite_preview,
+            user_intent=user_intent,
+        )
     if is_complete:
         return DialogueDecision(
             action=DialogueAction.FINALIZE,

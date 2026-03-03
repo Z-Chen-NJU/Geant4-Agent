@@ -3,7 +3,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from core.orchestrator.session_manager import process_turn, reset_session
+from core.orchestrator.constraint_ledger import find_lock
+from core.orchestrator.session_manager import get_or_create_session, process_turn, reset_session
 from core.orchestrator.types import CandidateUpdate, Intent, Producer, UpdateOp
 from core.slots.slot_frame import GeometrySlots, SlotFrame, SourceSlots
 from nlu.llm.slot_frame import LlmSlotBuildResult, parse_slot_payload
@@ -156,7 +157,7 @@ class SmokeNoOllamaTest(unittest.TestCase):
         reason_codes = {x.get("reason_code") for x in second.get("rejected_updates", [])}
         self.assertIn("E_OVERWRITE_WITHOUT_EXPLICIT_USER_INTENT", reason_codes)
 
-    def test_explicit_overwrite_is_allowed(self) -> None:
+    def test_explicit_overwrite_requires_confirmation(self) -> None:
         first = step(
             {
                 "text": "1m x 1m x 1m copper box target with gamma source",
@@ -182,10 +183,46 @@ class SmokeNoOllamaTest(unittest.TestCase):
                 "autofix": True,
             }
         )
+        self.assertEqual(second.get("dialogue_action"), "confirm_overwrite")
         mats2 = second.get("config", {}).get("materials", {}).get("selected_materials", [])
-        self.assertEqual(mats2, ["G4_Al"])
+        self.assertEqual(mats2, ["G4_Cu"])
+        self.assertEqual(len(second.get("dialogue_trace", {}).get("overwrite_preview", [])), 1)
+        state = get_or_create_session(sid)
+        material_lock = find_lock(state.constraint_ledger, "materials.selected_materials")
+        self.assertIsNotNone(material_lock)
+        self.assertTrue(material_lock.locked)
+        self.assertEqual(material_lock.value, ["G4_Cu"])
+
+        third = step(
+            {
+                "session_id": sid,
+                "text": "status",
+                "lang": "en",
+                "llm_router": False,
+                "llm_question": False,
+                "normalize_input": False,
+                "autofix": True,
+            }
+        )
+        self.assertEqual(third.get("dialogue_action"), "confirm_overwrite")
+        self.assertEqual(third.get("config", {}).get("materials", {}).get("selected_materials", []), ["G4_Cu"])
+        self.assertEqual(len(third.get("dialogue_trace", {}).get("overwrite_preview", [])), 1)
+
+        fourth = step(
+            {
+                "session_id": sid,
+                "text": "confirm",
+                "lang": "en",
+                "llm_router": False,
+                "llm_question": False,
+                "normalize_input": False,
+                "autofix": True,
+            }
+        )
+        mats4 = fourth.get("config", {}).get("materials", {}).get("selected_materials", [])
+        self.assertEqual(mats4, ["G4_Al"])
         self.assertEqual(
-            second.get("config", {}).get("materials", {}).get("volume_material_map"),
+            fourth.get("config", {}).get("materials", {}).get("volume_material_map"),
             {"box": "G4_Al"},
         )
 

@@ -6,6 +6,7 @@ from enum import Enum
 
 class DialogueAction(str, Enum):
     ASK_CLARIFICATION = "ask_clarification"
+    CONFIRM_OVERWRITE = "confirm_overwrite"
     SUMMARIZE_PROGRESS = "summarize_progress"
     CONFIRM_UPDATE = "confirm_update"
     ANSWER_STATUS = "answer_status"
@@ -19,6 +20,7 @@ class DialogueDecision:
     updated_paths: list[str] = field(default_factory=list)
     missing_fields: list[str] = field(default_factory=list)
     answered_this_turn: list[str] = field(default_factory=list)
+    overwrite_preview: list[dict] = field(default_factory=list)
     user_intent: str = "OTHER"
 
 
@@ -30,4 +32,5 @@ def build_dialogue_trace(decision: DialogueDecision) -> dict:
         "updated_paths": list(decision.updated_paths),
         "missing_fields": list(decision.missing_fields),
         "answered_this_turn": list(decision.answered_this_turn),
+        "overwrite_preview": list(decision.overwrite_preview),
     }

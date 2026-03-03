@@ -7,6 +7,7 @@ from typing import Any
 
 from core.audit.audit_log import append_audit_entry
 from core.config.defaults import build_strict_default_config
+from core.config.field_registry import friendly_label
 from core.config.phase_registry import phase_title
 from core.dialogue.policy import decide_dialogue_action
 from core.dialogue.renderer import render_dialogue_message
@@ -22,7 +23,7 @@ from core.orchestrator.path_ops import deep_copy, get_path, set_path
 from core.orchestrator.phase_machine import decide_phase_transition
 from core.orchestrator.semantic_sync import build_semantic_sync_candidate
 from core.orchestrator.turn_transaction import begin_turn, commit_turn
-from core.orchestrator.types import CandidateUpdate, Intent, Phase, Producer, SessionState
+from core.orchestrator.types import CandidateUpdate, Intent, Phase, Producer, SessionState, UpdateOp
 from core.slots.slot_mapper import slot_frame_to_candidates
 from core.validation.error_codes import (
     E_CANDIDATE_REJECTED_BY_GATE,
@@ -115,12 +116,6 @@ def _path_explicitly_requested(user_candidate: CandidateUpdate, path: str) -> bo
     return False
 
 
-def _path_related(a: str, b: str) -> bool:
-    if a == b:
-        return True
-    return a.startswith(b + ".") or b.startswith(a + ".")
-
-
 def _is_unset_for_overwrite(value: Any) -> bool:
     if value is None:
         return True
@@ -129,18 +124,6 @@ def _is_unset_for_overwrite(value: Any) -> bool:
     if isinstance(value, (list, dict)) and len(value) == 0:
         return True
     return False
-
-
-def _unlock_locks_for_explicit_targets(state_like: Any, user_candidate: CandidateUpdate) -> None:
-    if user_candidate.intent not in {Intent.SET, Intent.MODIFY}:
-        return
-    if not user_candidate.target_paths:
-        return
-    for item in state_like.constraint_ledger:
-        if not item.locked:
-            continue
-        if any(_path_related(item.path, target) for target in user_candidate.target_paths):
-            item.locked = False
 
 
 def _enforce_no_implicit_overwrite(
@@ -186,6 +169,76 @@ def _enforce_no_implicit_overwrite(
             )
         )
     return filtered_candidates, policy_rejected
+
+
+def _extract_pending_overwrites(
+    state_like: Any,
+    user_candidate: CandidateUpdate,
+    candidates: list[CandidateUpdate],
+    *,
+    lang: str,
+) -> tuple[list[CandidateUpdate], list[dict[str, Any]]]:
+    if user_candidate.intent not in {Intent.SET, Intent.MODIFY}:
+        return candidates, []
+    pending: list[dict[str, Any]] = []
+    filtered_candidates: list[CandidateUpdate] = []
+    for candidate in candidates:
+        kept: list[UpdateOp] = []
+        for upd in candidate.updates:
+            old = get_path(state_like.config, upd.path)
+            if _is_unset_for_overwrite(old) or old == upd.value:
+                kept.append(upd)
+                continue
+            if _path_explicitly_requested(user_candidate, upd.path):
+                pending.append(
+                    {
+                        "path": upd.path,
+                        "field": friendly_label(upd.path, lang),
+                        "old": old,
+                        "new": upd.value,
+                        "producer": candidate.producer.value,
+                    }
+                )
+                continue
+            kept.append(upd)
+        if not kept:
+            continue
+        if len(kept) == len(candidate.updates):
+            filtered_candidates.append(candidate)
+            continue
+        filtered_candidates.append(
+            CandidateUpdate(
+                producer=candidate.producer,
+                intent=candidate.intent,
+                target_paths=sorted({u.path for u in kept}),
+                updates=kept,
+                confidence=candidate.confidence,
+                rationale=f"{candidate.rationale}_overwrite_staged",
+            )
+        )
+    return filtered_candidates, pending
+
+
+def _candidate_from_pending_overwrite(items: list[dict[str, Any]], *, turn_id: int) -> CandidateUpdate:
+    updates = [
+        UpdateOp(
+            path=str(item["path"]),
+            op="set",
+            value=item.get("new"),
+            producer=Producer.USER_EXPLICIT,
+            confidence=1.0,
+            turn_id=turn_id,
+        )
+        for item in items
+    ]
+    return CandidateUpdate(
+        producer=Producer.USER_EXPLICIT,
+        intent=Intent.MODIFY,
+        target_paths=sorted({str(item["path"]) for item in items}),
+        updates=updates,
+        confidence=1.0,
+        rationale="confirmed_pending_overwrite",
+    )
 def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: float = 0.6, lang: str = "zh") -> dict:
     text = str(payload.get("text", "")).strip()
     if not text:
@@ -213,6 +266,10 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
     debug: dict[str, Any] = {"graph_candidates": []}
     normalized_text = text
     content_candidates: list[CandidateUpdate] = []
+    user_candidate: CandidateUpdate | None = None
+    applying_pending_overwrite = False
+    confirmation_gate_active = False
+    staged_pending_overwrite: list[dict[str, Any]] = []
 
     if enable_llm_first:
         slot_result = build_llm_slot_frame(
@@ -323,63 +380,98 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
             "backend": "fallback_normalizer",
         }
 
-    if get_path(draft.config, "geometry.structure") is not None:
+    if user_candidate is None:
+        return {"error": "user intent unavailable"}
+    dialogue_user_intent = user_candidate.intent.value
+
+    if state.pending_overwrite:
+        if user_candidate.intent == Intent.CONFIRM:
+            confirmed_candidate = _candidate_from_pending_overwrite(state.pending_overwrite, turn_id=state.turn_id)
+            content_candidates = [confirmed_candidate]
+            user_candidate = confirmed_candidate
+            applying_pending_overwrite = True
+            debug["inference_backend"] = f"{debug.get('inference_backend', 'orchestrated')}+confirmed_pending_overwrite"
+            normalization_payload = {
+                "intent": Intent.CONFIRM.value,
+                "confidence": 1.0,
+                "backend": "pending_overwrite_confirmation",
+            }
+        else:
+            confirmation_gate_active = True
+            staged_pending_overwrite = list(state.pending_overwrite)
+            content_candidates = []
+
+    if not confirmation_gate_active and get_path(draft.config, "geometry.structure") is not None:
         content_candidates = [
             filter_candidate_by_target_scopes(candidate, list(user_candidate.target_paths))
             for candidate in content_candidates
         ]
 
-    _unlock_locks_for_explicit_targets(draft, user_candidate)
-
-    candidates: list[CandidateUpdate] = list(content_candidates)
-    reco_candidate = recommend_physics_list(
-        text,
-        normalized_text,
-        context_summary=context_summary,
-        allowed_lists=KNOWLEDGE["physics_lists"],
-        turn_id=state.turn_id,
-        config_path=ollama_config_path,
-    )
-    if reco_candidate is not None:
-        candidates.append(reco_candidate)
-
-    candidates, policy_rejected = _enforce_no_implicit_overwrite(draft, user_candidate, candidates)
-    accepted_updates, rejected_updates, applied_rules = arbitrate_candidates(draft, candidates)
-    rejected_updates = policy_rejected + rejected_updates
-    committed_updates = list(accepted_updates)
-
-    working = deep_copy(draft.config)
-    _apply_updates(working, accepted_updates)
-    # synchronize deterministic derived fields after primary updates
-    post_default = build_semantic_sync_candidate(working, turn_id=state.turn_id, recent_updates=committed_updates)
-    if post_default:
-        _apply_updates(working, post_default.updates)
-        committed_updates.extend(post_default.updates)
-        applied_rules.append({"rule": "post_commit_semantic_sync", "count": len(post_default.updates)})
-
-    report = validate_all(working)
-    hard_errors = [e for e in report.errors if e.get("code") != "E_REQUIRED_MISSING"]
-
-    if hard_errors:
-        # rollback
-        rejected_updates.extend(
-            {
-                "path": upd.path,
-                "producer": upd.producer.value,
-                "reason_code": E_CANDIDATE_REJECTED_BY_GATE,
-                "detail": "rollback due to hard gate errors",
-            }
-            for upd in accepted_updates
-        )
+    if confirmation_gate_active:
         accepted_updates = []
+        rejected_updates = []
+        applied_rules = [{"rule": "pending_overwrite_confirmation_required", "count": len(staged_pending_overwrite)}]
         committed_updates = []
         working = deep_copy(draft.config)
         report = validate_all(working)
+        hard_errors = []
     else:
-        draft.config = working
-        for upd in committed_updates:
-            draft.field_sources[upd.path] = upd.producer.value
-        lock_from_candidate(draft.constraint_ledger, user_candidate, draft.config, state.turn_id)
+        candidates: list[CandidateUpdate] = list(content_candidates)
+        reco_candidate = recommend_physics_list(
+            text,
+            normalized_text,
+            context_summary=context_summary,
+            allowed_lists=KNOWLEDGE["physics_lists"],
+            turn_id=state.turn_id,
+            config_path=ollama_config_path,
+        )
+        if reco_candidate is not None:
+            candidates.append(reco_candidate)
+
+        candidates, policy_rejected = _enforce_no_implicit_overwrite(draft, user_candidate, candidates)
+        if not applying_pending_overwrite:
+            candidates, staged_pending_overwrite = _extract_pending_overwrites(
+                draft,
+                user_candidate,
+                candidates,
+                lang=lang,
+            )
+        accepted_updates, rejected_updates, applied_rules = arbitrate_candidates(draft, candidates)
+        rejected_updates = policy_rejected + rejected_updates
+        committed_updates = list(accepted_updates)
+
+        working = deep_copy(draft.config)
+        _apply_updates(working, accepted_updates)
+        # synchronize deterministic derived fields after primary updates
+        post_default = build_semantic_sync_candidate(working, turn_id=state.turn_id, recent_updates=committed_updates)
+        if post_default:
+            _apply_updates(working, post_default.updates)
+            committed_updates.extend(post_default.updates)
+            applied_rules.append({"rule": "post_commit_semantic_sync", "count": len(post_default.updates)})
+
+        report = validate_all(working)
+        hard_errors = [e for e in report.errors if e.get("code") != "E_REQUIRED_MISSING"]
+
+        if hard_errors:
+            # rollback
+            rejected_updates.extend(
+                {
+                    "path": upd.path,
+                    "producer": upd.producer.value,
+                    "reason_code": E_CANDIDATE_REJECTED_BY_GATE,
+                    "detail": "rollback due to hard gate errors",
+                }
+                for upd in accepted_updates
+            )
+            accepted_updates = []
+            committed_updates = []
+            working = deep_copy(draft.config)
+            report = validate_all(working)
+        else:
+            draft.config = working
+            for upd in committed_updates:
+                draft.field_sources[upd.path] = upd.producer.value
+            lock_from_candidate(draft.constraint_ledger, user_candidate, draft.config, state.turn_id)
 
     # phase transition: local uses same report in v0.2 prototype
     phase_config = working if not hard_errors else state.config
@@ -391,8 +483,14 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         # exact locks are already maintained by constraint ledger.
         pass
 
-    if not hard_errors:
+    if not hard_errors and not confirmation_gate_active:
         commit_turn(state, draft)
+        if applying_pending_overwrite:
+            state.pending_overwrite = []
+        elif staged_pending_overwrite:
+            state.pending_overwrite = staged_pending_overwrite
+    elif staged_pending_overwrite:
+        state.pending_overwrite = staged_pending_overwrite
 
     append_audit_entry(
         state=state,
@@ -404,41 +502,45 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         applied_rules=applied_rules,
     )
 
-    state.open_questions, answered_this_turn = advance_question_state(
-        previous_missing_paths=previous_missing_paths,
-        current_missing_paths=final_report.missing_required_paths,
-        open_questions=state.open_questions,
-    )
-
-    asked_fields = plan_questions(
-        final_report.missing_required_paths,
-        state.phase,
-        open_questions=state.open_questions,
-        last_asked_paths=state.last_asked_paths,
-        question_attempts=state.question_attempts,
-    )
-    if asked_fields:
-        for path in asked_fields:
-            if path in final_report.missing_required_paths and path not in state.open_questions:
-                state.open_questions.append(path)
+    if staged_pending_overwrite:
+        answered_this_turn = []
+        asked_fields = []
     else:
-        state.open_questions = []
-    state.last_asked_paths = list(asked_fields)
-    state.question_attempts = update_question_attempts(
-        previous_attempts=state.question_attempts,
-        current_missing_paths=final_report.missing_required_paths,
-        answered_paths=answered_this_turn,
-        asked_paths=asked_fields,
-    )
+        state.open_questions, answered_this_turn = advance_question_state(
+            previous_missing_paths=previous_missing_paths,
+            current_missing_paths=final_report.missing_required_paths,
+            open_questions=state.open_questions,
+        )
+        asked_fields = plan_questions(
+            final_report.missing_required_paths,
+            state.phase,
+            open_questions=state.open_questions,
+            last_asked_paths=state.last_asked_paths,
+            question_attempts=state.question_attempts,
+        )
+        if asked_fields:
+            for path in asked_fields:
+                if path in final_report.missing_required_paths and path not in state.open_questions:
+                    state.open_questions.append(path)
+        else:
+            state.open_questions = []
+        state.last_asked_paths = list(asked_fields)
+        state.question_attempts = update_question_attempts(
+            previous_attempts=state.question_attempts,
+            current_missing_paths=final_report.missing_required_paths,
+            answered_paths=answered_this_turn,
+            asked_paths=asked_fields,
+        )
     asked_fields_friendly = to_friendly_labels(asked_fields, lang)
     updated_paths = [upd.path for upd in committed_updates]
     dialogue_decision = decide_dialogue_action(
-        user_intent=user_candidate.intent.value,
+        user_intent=dialogue_user_intent,
         is_complete=is_complete,
         asked_fields=asked_fields,
         missing_fields=final_report.missing_required_paths,
         updated_paths=updated_paths,
         answered_this_turn=answered_this_turn,
+        pending_overwrite_preview=staged_pending_overwrite,
         last_dialogue_action=state.last_dialogue_action,
     )
     dialogue_trace = build_dialogue_trace(dialogue_decision)

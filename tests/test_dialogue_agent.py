@@ -30,6 +30,18 @@ class DialogueAgentTest(unittest.TestCase):
         )
         self.assertEqual(decision.action, DialogueAction.ASK_CLARIFICATION)
 
+    def test_policy_requests_overwrite_confirmation_when_preview_exists(self) -> None:
+        decision = decide_dialogue_action(
+            user_intent="MODIFY",
+            is_complete=False,
+            asked_fields=[],
+            missing_fields=["output.path"],
+            updated_paths=[],
+            answered_this_turn=[],
+            pending_overwrite_preview=[{"path": "materials.selected_materials", "old": "G4_Cu", "new": "G4_Al"}],
+        )
+        self.assertEqual(decision.action, DialogueAction.CONFIRM_OVERWRITE)
+
     def test_policy_summarizes_progress_after_answering_clarification(self) -> None:
         decision = decide_dialogue_action(
             user_intent="SET",
@@ -41,6 +53,28 @@ class DialogueAgentTest(unittest.TestCase):
             last_dialogue_action="ask_clarification",
         )
         self.assertEqual(decision.action, DialogueAction.SUMMARIZE_PROGRESS)
+
+    def test_renderer_can_emit_overwrite_confirmation(self) -> None:
+        decision = decide_dialogue_action(
+            user_intent="MODIFY",
+            is_complete=False,
+            asked_fields=[],
+            missing_fields=[],
+            updated_paths=[],
+            answered_this_turn=[],
+            pending_overwrite_preview=[
+                {"field": "materials", "path": "materials.selected_materials", "old": "G4_Cu", "new": "G4_Al"}
+            ],
+        )
+        msg = render_dialogue_message(
+            decision,
+            lang="en",
+            use_llm_question=False,
+            ollama_config="",
+            user_temperature=1.0,
+        )
+        self.assertIn("Please confirm", msg)
+        self.assertIn("G4_Cu -> G4_Al", msg)
 
     def test_renderer_can_emit_non_llm_status_messages(self) -> None:
         decision = decide_dialogue_action(

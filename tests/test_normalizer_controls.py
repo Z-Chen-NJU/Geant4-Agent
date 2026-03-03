@@ -32,6 +32,13 @@ class NormalizerControlsTest(unittest.TestCase):
         self.assertIn("source.position", controls["target_paths"])
         self.assertIn("source.direction", controls["target_paths"])
 
+    def test_cylindrical_prompt_targets_geometry_structure_and_tubs_params(self) -> None:
+        controls = infer_user_turn_controls("Create a cylindrical copper target with radius 30 mm and half-length 50 mm.")
+        self.assertEqual(controls["intent"], Intent.SET)
+        self.assertIn("geometry.structure", controls["target_paths"])
+        self.assertIn("geometry.params.child_rmax", controls["target_paths"])
+        self.assertIn("geometry.params.child_hz", controls["target_paths"])
+
 
 if __name__ == "__main__":
     unittest.main()

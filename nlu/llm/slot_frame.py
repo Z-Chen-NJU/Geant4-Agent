@@ -23,6 +23,7 @@ _GEOMETRY_ALIASES = {
     "cuboid": "box",
     "single_box": "box",
     "cylinder": "cylinder",
+    "cylindrical": "cylinder",
     "tubs": "cylinder",
     "single_tubs": "cylinder",
     "sphere": "sphere",
@@ -330,6 +331,14 @@ def _present_slot_paths(frame: SlotFrame) -> set[str]:
     return paths
 
 
+def _normalize_inferred_slots(frame: SlotFrame) -> None:
+    if frame.geometry.kind is None:
+        if frame.geometry.size_triplet_mm:
+            frame.geometry.kind = "box"
+        elif frame.geometry.radius_mm is not None or frame.geometry.half_length_mm is not None:
+            frame.geometry.kind = "cylinder"
+
+
 def _geometry_box_from_phrase(text: str) -> list[float] | None:
     low = text.lower().replace("×", "x")
     m = re.search(
@@ -554,7 +563,7 @@ def _backfill_from_user_text(frame: SlotFrame, user_text: str) -> None:
     if frame.geometry.kind is None:
         if any(token in low for token in ("box", "cube", "cuboid")) or any(token in text for token in ("\u7acb\u65b9\u4f53", "\u7acb\u65b9\u5757")):
             frame.geometry.kind = "box"
-        elif any(token in low for token in ("cylinder", "tubs")) or "\u5706\u67f1" in text:
+        elif any(token in low for token in ("cylinder", "cylindrical", "tubs")) or "\u5706\u67f1" in text:
             frame.geometry.kind = "cylinder"
         elif "sphere" in low or "\u7403" in text:
             frame.geometry.kind = "sphere"
@@ -591,6 +600,8 @@ def _backfill_from_user_text(frame: SlotFrame, user_text: str) -> None:
         direction = _source_direction_from_phrase(text)
         if direction is not None:
             frame.source.direction_vec = direction
+
+    _normalize_inferred_slots(frame)
 
 
 def _coerce_slot_payload(payload: dict[str, Any]) -> tuple[SlotFrame, dict[str, Any]]:
@@ -668,6 +679,7 @@ def _coerce_slot_payload(payload: dict[str, Any]) -> tuple[SlotFrame, dict[str, 
 def parse_slot_payload(payload: dict[str, Any]) -> tuple[SlotFrame | None, dict[str, Any]]:
     frame, meta = _coerce_slot_payload(payload)
     _backfill_from_normalized_text(frame)
+    _normalize_inferred_slots(frame)
     validation = validate_slot_frame(frame)
     meta = {
         "confidence": frame.confidence,
@@ -739,6 +751,7 @@ def build_llm_slot_frame(
 
     raw_before = set(normalized_after)
     _backfill_from_user_text(frame, user_text)
+    _normalize_inferred_slots(frame)
     raw_after = _present_slot_paths(frame)
     stage_trace["raw_text_backfill_fields"] = sorted(raw_after - raw_before)
     stage_trace["repair_used"] = bool(stage_trace["normalized_backfill_fields"] or stage_trace["raw_text_backfill_fields"])

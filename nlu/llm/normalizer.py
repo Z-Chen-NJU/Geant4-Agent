@@ -12,7 +12,7 @@ _TARGET_HINTS = {
     "geometry.params.module_x": ["module_x", "x=", "x:", "宽", "x方向"],
     "geometry.params.module_y": ["module_y", "y=", "y:", "高", "y方向"],
     "geometry.params.module_z": ["module_z", "z=", "z:", "厚", "z方向"],
-    "geometry.structure": ["structure", "geometry", "box", "cube", "sphere", "cylinder", "ring", "grid"],
+    "geometry.structure": ["structure", "geometry", "box", "cube", "sphere", "cylinder", "cylindrical", "ring", "grid"],
     "materials.selected_materials": ["material", "铜", "copper", "g4_"],
     "source.type": ["source type", "point", "beam", "isotropic", "点源", "束流"],
     "source.particle": ["gamma", "electron", "proton", "particle", "粒子"],
@@ -107,11 +107,13 @@ def _collect_target_paths(payload: str) -> list[str]:
             ]
         )
     if any(keyword in low for keyword in ["radius", "diameter", "\u534a\u5f84"]):
+        out.append("geometry.structure")
         out.append("geometry.params.child_rmax")
     if any(
         keyword in low
         for keyword in ["half-length", "half length", "half length", "\u534a\u957f", "height", "length", "\u9ad8\u5ea6"]
     ):
+        out.append("geometry.structure")
         out.append("geometry.params.child_hz")
     if re.search(_VECTOR_LITERAL, low):
         if any(keyword in low for keyword in ["position", "origin", "center", "\u4f4d\u7f6e", "\u539f\u70b9", "\u4e2d\u5fc3"]):

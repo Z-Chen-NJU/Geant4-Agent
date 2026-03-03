@@ -142,6 +142,25 @@ class DialogueAgentTest(unittest.TestCase):
         )
         self.assertEqual(decision.action, DialogueAction.CONFIRM_UPDATE)
 
+    def test_policy_can_explain_with_metadata_only_updates(self) -> None:
+        decision = decide_dialogue_action(
+            user_intent="QUESTION",
+            is_complete=True,
+            asked_fields=[],
+            missing_fields=[],
+            updated_paths=["physics.backup_physics_list", "physics.selection_source"],
+            answered_this_turn=[],
+            available_explanations={
+                "physics": {
+                    "label": "Physics",
+                    "field": "physics list",
+                    "source": "llm_recommender",
+                    "reasons": ["Selected for gamma attenuation coverage."],
+                }
+            },
+        )
+        self.assertEqual(decision.action, DialogueAction.EXPLAIN_CHOICE)
+
     def test_renderer_can_emit_non_llm_status_messages(self) -> None:
         decision = decide_dialogue_action(
             user_intent="MODIFY",

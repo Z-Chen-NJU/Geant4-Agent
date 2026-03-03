@@ -212,6 +212,25 @@ class LlmSlotFrameTest(unittest.TestCase):
         self.assertIn("source.position_mm", result.stage_trace.get("raw_text_backfill_fields", []))
         self.assertIn("source.direction_vec", result.stage_trace.get("raw_text_backfill_fields", []))
 
+    def test_parse_slot_payload_inferrs_cylinder_kind_from_dimensions(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 0.8,
+            "normalized_text": "",
+            "target_slots": ["geometry.radius_mm", "geometry.half_length_mm"],
+            "slots": {
+                "geometry": {
+                    "radius_mm": "30 mm",
+                    "half_length_mm": "50 mm",
+                }
+            },
+        }
+        frame, meta = parse_slot_payload(payload)
+        self.assertIsNotNone(frame)
+        assert frame is not None
+        self.assertEqual(meta.get("schema_errors"), [])
+        self.assertEqual(frame.geometry.kind, "cylinder")
+
 
 if __name__ == "__main__":
     unittest.main()

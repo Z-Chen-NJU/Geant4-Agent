@@ -3,6 +3,23 @@ from __future__ import annotations
 from core.dialogue.types import DialogueAction, DialogueDecision
 
 
+_EXPLANATION_SAFE_METADATA_PATHS = {
+    "physics.backup_physics_list",
+    "physics.selection_source",
+    "physics.selection_reasons",
+    "materials.selection_source",
+    "materials.selection_reasons",
+    "source.selection_source",
+    "source.selection_reasons",
+}
+
+
+def _updated_paths_block_explanation(updated_paths: list[str]) -> bool:
+    if not updated_paths:
+        return False
+    return any(path not in _EXPLANATION_SAFE_METADATA_PATHS for path in updated_paths)
+
+
 def decide_dialogue_action(
     *,
     user_intent: str,
@@ -30,7 +47,12 @@ def decide_dialogue_action(
         for key, value in available_explanations.items()
         if isinstance(value, dict) and (value.get("source") or value.get("reasons"))
     }
-    should_explain = bool(explainable_sources) and user_intent == "QUESTION" and not asked_fields and not updated_paths
+    should_explain = (
+        bool(explainable_sources)
+        and user_intent == "QUESTION"
+        and not asked_fields
+        and not _updated_paths_block_explanation(updated_paths)
+    )
     if should_explain:
         return DialogueDecision(
             action=DialogueAction.EXPLAIN_CHOICE,

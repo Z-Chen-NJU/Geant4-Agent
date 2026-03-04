@@ -148,6 +148,28 @@ def _expect_output_supplement(turns: list[dict[str, Any]]) -> tuple[bool, list[s
     return (not reasons, reasons)
 
 
+def _expect_output_format_complete(expected_format: str) -> Callable[[list[dict[str, Any]]], tuple[bool, list[str]]]:
+    def _evaluator(turns: list[dict[str, Any]]) -> tuple[bool, list[str]]:
+        out = _last(turns)
+        cfg = out["config"]
+        reasons: list[str] = []
+        if not out.get("is_complete"):
+            reasons.append("final turn not complete")
+        if _field(cfg, "output.format") != expected_format:
+            reasons.append(f"output.format != {expected_format}")
+        path = str(_field(cfg, "output.path", "") or "")
+        if not path:
+            reasons.append("output.path missing")
+        else:
+            suffix_map = {"root": ".root", "json": ".json", "csv": ".csv", "xml": ".xml", "hdf5": ".hdf5"}
+            expected_suffix = suffix_map.get(expected_format)
+            if expected_suffix and not path.lower().endswith(expected_suffix):
+                reasons.append(f"output.path does not end with {expected_suffix}")
+        return (not reasons, reasons)
+
+    return _evaluator
+
+
 def _expect_progressive_completion(turns: list[dict[str, Any]]) -> tuple[bool, list[str]]:
     out = _last(turns)
     reasons: list[str] = []
@@ -363,6 +385,68 @@ def build_multiturn_cases() -> list[EvalCase]:
     return cases
 
 
+def build_output_format_cases() -> list[EvalCase]:
+    cases: list[EvalCase] = []
+
+    def add(case_id: str, title: str, turns: list[str], lang: str, expected_format: str) -> None:
+        cases.append(
+            EvalCase(
+                case_id=case_id,
+                suite="output_formats_strict_contract",
+                title=title,
+                language=lang,
+                turns=[EvalTurn(text=text, lang=lang) for text in turns],
+                evaluator=_expect_output_format_complete(expected_format),
+            )
+        )
+
+    add(
+        "OF1_EN",
+        "Explicit HDF5 output",
+        [
+            "Please set up a 1 m x 1 m x 1 m copper box target with a gamma point source at (0,0,-100) mm pointing (0,0,1), energy 1 MeV, physics FTFP_BERT, output ROOT.",
+            "Output hdf5.",
+            "confirm",
+        ],
+        "en",
+        "hdf5",
+    )
+    add(
+        "OF1_ZH",
+        "显式 HDF5 输出",
+        [
+            "请建立一个1米见方的铜立方体靶，使用gamma点源，位置为(0,0,-100)毫米，方向为(0,0,1)，能量1 MeV，物理列表用FTFP_BERT，输出ROOT。",
+            "输出 hdf5。",
+            "确认",
+        ],
+        "zh",
+        "hdf5",
+    )
+    add(
+        "OF2_EN",
+        "Explicit XML output",
+        [
+            "Please set up a 1 m x 1 m x 1 m copper box target with a gamma point source at (0,0,-100) mm pointing (0,0,1), energy 1 MeV, physics FTFP_BERT, output ROOT.",
+            "Output xml.",
+            "confirm",
+        ],
+        "en",
+        "xml",
+    )
+    add(
+        "OF2_ZH",
+        "显式 XML 输出",
+        [
+            "请建立一个1米见方的铜立方体靶，使用gamma点源，位置为(0,0,-100)毫米，方向为(0,0,1)，能量1 MeV，物理列表用FTFP_BERT，输出ROOT。",
+            "输出 xml。",
+            "确认",
+        ],
+        "zh",
+        "xml",
+    )
+    return cases
+
+
 def _run_case(case: EvalCase, *, ollama_config_path: str, min_confidence: float) -> dict[str, Any]:
     session_id = f"eval-{case.case_id}"
     reset_session(session_id)
@@ -502,7 +586,7 @@ def main() -> None:
     parser.add_argument("--model", default="qwen3:14b")
     parser.add_argument("--timeout-s", type=int, default=180)
     parser.add_argument("--min-confidence", type=float, default=0.6)
-    parser.add_argument("--suite", choices=["all", "bilingual", "multiturn"], default="all")
+    parser.add_argument("--suite", choices=["all", "bilingual", "multiturn", "output_formats"], default="all")
     parser.add_argument("--case-id", action="append", default=[])
     args = parser.parse_args()
 
@@ -521,6 +605,11 @@ def main() -> None:
         multiturn = _suite_report(multiturn_cases, ollama_config_path=ollama_config_path, min_confidence=args.min_confidence)
         _write_suite_outputs(multiturn, stem="multiturn_dialogue_eval_strict_contract", base_url=args.base_url, model=args.model)
         summary["multiturn"] = {"passed": multiturn["passed"], "total": multiturn["total"]}
+    if args.suite in {"all", "output_formats"}:
+        output_cases = _filter_cases(build_output_format_cases(), selected_ids)
+        output_formats = _suite_report(output_cases, ollama_config_path=ollama_config_path, min_confidence=args.min_confidence)
+        _write_suite_outputs(output_formats, stem="output_formats_eval_strict_contract", base_url=args.base_url, model=args.model)
+        summary["output_formats"] = {"passed": output_formats["passed"], "total": output_formats["total"]}
     if bilingual and multiturn:
         _write_summary(bilingual=bilingual, multiturn=multiturn, base_url=args.base_url, model=args.model)
     print(json.dumps(summary, ensure_ascii=False))

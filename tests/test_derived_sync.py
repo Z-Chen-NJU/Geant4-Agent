@@ -37,6 +37,20 @@ class DerivedSyncTest(unittest.TestCase):
         mapped = {u.path: u.value for u in candidate.updates}
         self.assertEqual(mapped["output.path"], "output/result.json")
 
+    def test_updates_output_path_extension_when_format_changes(self) -> None:
+        config = {
+            "geometry": {},
+            "materials": {},
+            "source": {},
+            "physics": {},
+            "output": {"format": "hdf5", "path": "output/result.root"},
+        }
+        candidate = build_derived_sync_candidate(config, turn_id=2)
+        self.assertIsNotNone(candidate)
+        assert candidate is not None
+        mapped = {u.path: u.value for u in candidate.updates}
+        self.assertEqual(mapped["output.path"], "output/result.hdf5")
+
     def test_fills_physics_selection_metadata_for_explicit_list(self) -> None:
         config = {
             "geometry": {},

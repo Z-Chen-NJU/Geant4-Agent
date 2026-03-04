@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import PurePosixPath
+
 from core.orchestrator.path_ops import get_path
 from core.orchestrator.types import CandidateUpdate, Intent, Producer, UpdateOp
 
@@ -21,9 +23,32 @@ def _latest_update_for_prefix(recent_updates: list[UpdateOp] | None, prefix: str
 def _sync_output(config: dict) -> dict[str, object]:
     fmt = get_path(config, "output.format")
     path = get_path(config, "output.path")
-    if fmt and not path:
-        return {"output.path": f"output/result.{str(fmt).lower()}"}
-    return {}
+    if not fmt:
+        return {}
+
+    suffix_map = {
+        "csv": ".csv",
+        "hdf5": ".hdf5",
+        "json": ".json",
+        "root": ".root",
+        "xml": ".xml",
+    }
+    expected_suffix = suffix_map.get(str(fmt).lower())
+    if not expected_suffix:
+        return {}
+
+    if not path:
+        return {"output.path": f"output/result{expected_suffix}"}
+
+    raw_path = str(path).replace("\\", "/")
+    if raw_path.lower().endswith(expected_suffix):
+        return {}
+
+    posix_path = PurePosixPath(raw_path)
+    updated_path = f"{posix_path.with_suffix(expected_suffix)}"
+    if updated_path == raw_path:
+        return {}
+    return {"output.path": updated_path}
 
 
 def _sync_geometry(config: dict) -> dict[str, object]:

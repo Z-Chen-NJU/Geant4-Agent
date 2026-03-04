@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from core.config.output_format_registry import accepted_output_formats
+
 
 @dataclass
 class ValidationIssue:
@@ -81,11 +83,14 @@ def _load_list(path: str | Path) -> List[str]:
 def validate_min_config(config: Dict[str, object]) -> List[ValidationIssue]:
     issues: List[ValidationIssue] = []
     # Validate physics list
-    physics = config.get("physics_list", {})
-    if isinstance(physics, dict) and "name" in physics:
+    physics = config.get("physics", {})
+    if not isinstance(physics, dict):
+        physics = config.get("physics_list", {})
+    if isinstance(physics, dict) and ("physics_list" in physics or "name" in physics):
         valid_lists = _load_list("knowledge/data/physics_lists.json")
-        if physics["name"] not in valid_lists:
-            issues.append(ValidationIssue("warning", "physics_list.name not in curated list"))
+        name = physics.get("physics_list", physics.get("name"))
+        if name not in valid_lists:
+            issues.append(ValidationIssue("warning", "physics.physics_list not in curated list"))
     # Validate source particle
     source = config.get("source", {})
     if isinstance(source, dict) and "particle" in source:
@@ -95,42 +100,52 @@ def validate_min_config(config: Dict[str, object]) -> List[ValidationIssue]:
     # Validate output format
     output = config.get("output", {})
     if isinstance(output, dict) and "format" in output:
-        valid_formats = _load_list("knowledge/data/output_formats.json")
+        valid_formats = accepted_output_formats()
         if output["format"] not in valid_formats:
             issues.append(ValidationIssue("warning", "output.format not in curated list"))
 
     # Validate source ranges
     source = config.get("source", {})
     if isinstance(source, dict):
-        energy = source.get("energy_MeV")
+        energy = source.get("energy", source.get("energy_MeV"))
         if energy is not None and float(energy) <= 0:
-            issues.append(ValidationIssue("error", "source.energy_MeV must be > 0"))
+            issues.append(ValidationIssue("error", "source.energy must be > 0"))
         # Basic direction sanity
-        direction = source.get("direction", {})
+        direction = source.get("direction")
+        vec = None
         if isinstance(direction, dict):
             vec = direction.get("value")
-            if isinstance(vec, list) and len(vec) == 3:
-                if all(float(v) == 0.0 for v in vec):
-                    issues.append(ValidationIssue("error", "source.direction vector cannot be zero"))
+        elif isinstance(direction, list):
+            vec = direction
+        if isinstance(vec, list) and len(vec) == 3:
+            if all(float(v) == 0.0 for v in vec):
+                issues.append(ValidationIssue("error", "source.direction vector cannot be zero"))
         # Optional bounds
         constraints_path = Path("knowledge/data/source_constraints.json")
         if constraints_path.exists() and energy is not None:
             c = json.loads(constraints_path.read_text(encoding="utf-8"))
             max_e = float(c.get("energy_MeV", {}).get("max", float("inf")))
             if float(energy) > max_e:
-                issues.append(ValidationIssue("warning", "source.energy_MeV exceeds project bounds"))
+                issues.append(ValidationIssue("warning", "source.energy exceeds project bounds"))
 
     # Validate volume-material map against provided volume names
     geometry = config.get("geometry", {})
     if isinstance(geometry, dict) and "volume_names" in geometry:
         vols = set(geometry.get("volume_names", []))
-        mat_map = config.get("materials", {}).get("volume_material_map", [])
-        for item in mat_map:
-            if isinstance(item, dict):
-                vol = item.get("volume")
+        raw_map = config.get("materials", {}).get("volume_material_map", [])
+        mapped = set()
+        if isinstance(raw_map, dict):
+            for vol in raw_map.keys():
                 if vol not in vols:
                     issues.append(ValidationIssue("warning", f"volume_material_map volume not in geometry.volume_names: {vol}"))
-        mapped = {item.get("volume") for item in mat_map if isinstance(item, dict)}
+                mapped.add(vol)
+        else:
+            for item in raw_map:
+                if isinstance(item, dict):
+                    vol = item.get("volume")
+                    if vol not in vols:
+                        issues.append(ValidationIssue("warning", f"volume_material_map volume not in geometry.volume_names: {vol}"))
+                    mapped.add(vol)
         missing = vols - mapped
         if missing:
             issues.append(ValidationIssue("warning", f"volume_material_map missing volumes: {sorted(missing)}"))

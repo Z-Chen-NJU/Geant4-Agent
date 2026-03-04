@@ -57,9 +57,9 @@ Notes:
 
 - `data/physics_lists.json`：官方 reference physics lists
 - `data/particles.json`：官方粒子列表
-- `data/output_formats.json`：项目自定义输出格式
+- `data/output_formats.json`：Geant4 官方分析输出格式 + 项目扩展
 
 备注：
 - `data/physics_lists.json` 来自官方 reference physics list 页面。
 - `data/particles.json` 来自官方 particle list 页面。
-- `data/output_formats.json` 为项目自定义（非官方）。
+- `data/output_formats.json` 现在以 Geant4 官方分析管理器支持的文件类型（`csv`、`hdf5`、`root`、`xml`）为主，并保留项目本地 `json` 扩展。

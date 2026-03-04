@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import date
 import json
 import tempfile
 from dataclasses import dataclass
@@ -510,21 +511,28 @@ def _filter_cases(cases: list[EvalCase], selected_ids: set[str]) -> list[EvalCas
     return [case for case in cases if case.case_id in selected_ids]
 
 
-def _write_suite_outputs(report: dict[str, Any], *, stem: str, base_url: str, model: str) -> None:
+def _write_suite_outputs(
+    report: dict[str, Any],
+    *,
+    stem: str,
+    base_url: str,
+    model: str,
+    report_date: str,
+) -> None:
     payload = {
-        "date": "2026-03-03",
+        "date": report_date,
         "base_url": base_url,
         "model": model,
         **report,
     }
-    json_path = DOCS_DIR / f"{stem}_2026-03-03.json"
-    md_path = DOCS_DIR / f"{stem}_2026-03-03.md"
+    json_path = DOCS_DIR / f"{stem}_{report_date}.json"
+    md_path = DOCS_DIR / f"{stem}_{report_date}.md"
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
     lines = [
         f"# {report['suite']}",
         "",
-        f"- Date: 2026-03-03",
+        f"- Date: {report_date}",
         f"- Base URL: `{base_url}`",
         f"- Model: `{model}`",
         f"- Passed: `{report['passed']}/{report['total']}`",
@@ -550,11 +558,18 @@ def _write_suite_outputs(report: dict[str, Any], *, stem: str, base_url: str, mo
     md_path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def _write_summary(*, bilingual: dict[str, Any], multiturn: dict[str, Any], base_url: str, model: str) -> None:
+def _write_summary(
+    *,
+    bilingual: dict[str, Any],
+    multiturn: dict[str, Any],
+    base_url: str,
+    model: str,
+    report_date: str,
+) -> None:
     lines = [
         "# Strict Contract Dialogue Evaluation Summary",
         "",
-        "- Date: 2026-03-03",
+        f"- Date: {report_date}",
         f"- Base URL: `{base_url}`",
         f"- Model: `{model}`",
         "",
@@ -577,17 +592,18 @@ def _write_summary(*, bilingual: dict[str, Any], multiturn: dict[str, Any], base
             for item in failed:
                 lines.append(f"- `{item['case_id']}`: {item['failure_reasons']}")
         lines.append("")
-    (DOCS_DIR / "strict_contract_dialogue_summary_2026-03-03.md").write_text("\n".join(lines), encoding="utf-8")
+    (DOCS_DIR / f"strict_contract_dialogue_summary_{report_date}.md").write_text("\n".join(lines), encoding="utf-8")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-url", default="http://114.212.130.6:11434")
+    parser.add_argument("--base-url", default="http://localhost:11434")
     parser.add_argument("--model", default="qwen3:14b")
     parser.add_argument("--timeout-s", type=int, default=180)
     parser.add_argument("--min-confidence", type=float, default=0.6)
     parser.add_argument("--suite", choices=["all", "bilingual", "multiturn", "output_formats"], default="all")
     parser.add_argument("--case-id", action="append", default=[])
+    parser.add_argument("--report-date", default=date.today().isoformat())
     args = parser.parse_args()
 
     ollama_config_path = _write_ollama_config(args.base_url, args.model, args.timeout_s)
@@ -598,20 +614,44 @@ def main() -> None:
     if args.suite in {"all", "bilingual"}:
         bilingual_cases = _filter_cases(build_bilingual_cases(), selected_ids)
         bilingual = _suite_report(bilingual_cases, ollama_config_path=ollama_config_path, min_confidence=args.min_confidence)
-        _write_suite_outputs(bilingual, stem="bilingual_dialogue_eval_strict_contract", base_url=args.base_url, model=args.model)
+        _write_suite_outputs(
+            bilingual,
+            stem="bilingual_dialogue_eval_strict_contract",
+            base_url=args.base_url,
+            model=args.model,
+            report_date=args.report_date,
+        )
         summary["bilingual"] = {"passed": bilingual["passed"], "total": bilingual["total"]}
     if args.suite in {"all", "multiturn"}:
         multiturn_cases = _filter_cases(build_multiturn_cases(), selected_ids)
         multiturn = _suite_report(multiturn_cases, ollama_config_path=ollama_config_path, min_confidence=args.min_confidence)
-        _write_suite_outputs(multiturn, stem="multiturn_dialogue_eval_strict_contract", base_url=args.base_url, model=args.model)
+        _write_suite_outputs(
+            multiturn,
+            stem="multiturn_dialogue_eval_strict_contract",
+            base_url=args.base_url,
+            model=args.model,
+            report_date=args.report_date,
+        )
         summary["multiturn"] = {"passed": multiturn["passed"], "total": multiturn["total"]}
     if args.suite in {"all", "output_formats"}:
         output_cases = _filter_cases(build_output_format_cases(), selected_ids)
         output_formats = _suite_report(output_cases, ollama_config_path=ollama_config_path, min_confidence=args.min_confidence)
-        _write_suite_outputs(output_formats, stem="output_formats_eval_strict_contract", base_url=args.base_url, model=args.model)
+        _write_suite_outputs(
+            output_formats,
+            stem="output_formats_eval_strict_contract",
+            base_url=args.base_url,
+            model=args.model,
+            report_date=args.report_date,
+        )
         summary["output_formats"] = {"passed": output_formats["passed"], "total": output_formats["total"]}
     if bilingual and multiturn:
-        _write_summary(bilingual=bilingual, multiturn=multiturn, base_url=args.base_url, model=args.model)
+        _write_summary(
+            bilingual=bilingual,
+            multiturn=multiturn,
+            base_url=args.base_url,
+            model=args.model,
+            report_date=args.report_date,
+        )
     print(json.dumps(summary, ensure_ascii=False))
 
 

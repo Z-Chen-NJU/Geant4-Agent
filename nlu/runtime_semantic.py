@@ -8,6 +8,7 @@ from typing import Any
 from core.semantic_frame import SemanticFrame
 from nlu.runtime_components.graph_search import search_candidate_graphs
 from nlu.runtime_components.infer import extract_params
+from nlu.runtime_components.infer import _require_local_model_dir
 from nlu.runtime_components.postprocess import merge_params
 
 
@@ -99,9 +100,7 @@ def _alias_match(text: str, mapping: dict[str, str], allowed: list[str]) -> str 
 
 def _pick_ner_model() -> str:
     p = MODELS_DIR / "ner"
-    if (p / "config.json").exists():
-        return str(p)
-    return "nlu/bert_lab/models/ner"
+    return _require_local_model_dir(p, label="NER")
 
 
 def _candidate_payload(candidate: Any) -> dict[str, Any]:

@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import unittest
 
-from knowledge.validate import validate_min_config
+from knowledge.validate import validate_material_spec, validate_min_config
 
 
 class KnowledgeValidateTest(unittest.TestCase):
+    def test_validate_material_spec_reports_non_numeric_fields(self) -> None:
+        issues = validate_material_spec({"material": "G4_Cu", "temperature_K": "hot"})
+        messages = [i.message for i in issues]
+        self.assertIn("temperature_K must be numeric", messages)
+
     def test_validate_min_config_accepts_current_nested_schema(self) -> None:
         config = {
             "physics": {"physics_list": "FTFP_BERT"},
@@ -38,6 +43,21 @@ class KnowledgeValidateTest(unittest.TestCase):
         messages = [i.message for i in issues]
         self.assertIn("source.direction vector cannot be zero", messages)
         self.assertIn("output.format not in curated list", messages)
+
+    def test_validate_min_config_reports_non_numeric_source_values(self) -> None:
+        config = {
+            "physics": {"physics_list": "FTFP_BERT"},
+            "source": {
+                "particle": "gamma",
+                "energy": "one",
+                "direction": ["x", 0.0, 1.0],
+            },
+            "output": {"format": "root", "path": "out/result.root"},
+        }
+        issues = validate_min_config(config)
+        messages = [i.message for i in issues]
+        self.assertIn("source.energy must be numeric", messages)
+        self.assertIn("source.direction must be numeric", messages)
 
 
 if __name__ == "__main__":

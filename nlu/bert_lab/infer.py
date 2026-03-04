@@ -18,19 +18,27 @@ _STRUCTURE_CACHE: Dict[tuple[str, str], tuple[AutoTokenizer, AutoModelForSequenc
 _NER_CACHE: Dict[tuple[str, str], tuple[AutoTokenizer, AutoModelForTokenClassification, torch.device]] = {}
 
 
+def _require_local_model_dir(path: Path, *, label: str) -> str:
+    config_path = path / "config.json"
+    if config_path.exists():
+        return str(path)
+    raise RuntimeError(
+        f"Missing local {label} model at '{path}'. "
+        "Train it locally first or configure an explicit local model path."
+    )
+
+
 def _default_structure_model() -> str:
     for name in ["structure_controlled_v4c_e1", "structure_controlled_v3_e1", "structure_controlled_smoke", "structure_opt_v3", "structure_opt_v2", "structure"]:
         p = MODELS_DIR / name
         if (p / "config.json").exists():
             return str(p)
-    return "nlu/bert_lab/models/structure_controlled_v4c_e1"
+    return _require_local_model_dir(MODELS_DIR / "structure_controlled_v4c_e1", label="structure")
 
 
 def _default_ner_model() -> str:
     p = MODELS_DIR / "ner"
-    if (p / "config.json").exists():
-        return str(p)
-    return "nlu/bert_lab/models/ner"
+    return _require_local_model_dir(p, label="NER")
 
 
 def _softmax(x: torch.Tensor) -> torch.Tensor:

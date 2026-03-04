@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from core.semantic_frame import SemanticFrame
 from nlu.runtime_components.graph_search import search_candidate_graphs
 from nlu.runtime_components.infer import extract_params
+from nlu.runtime_components.infer import _require_local_model_dir
 from nlu.bert_lab.llm_bridge import build_normalization_prompt
 from nlu.bert_lab.multitask_infer import predict_multitask
 from nlu.bert_lab.ollama_client import chat, extract_json
@@ -116,7 +117,7 @@ def _pick_ner_model() -> str:
     for p in candidates:
         if (p / "config.json").exists():
             return str(p)
-    return "nlu/bert_lab/models/ner"
+    return _require_local_model_dir(MODELS_DIR / "ner", label="NER")
 
 
 def _pick_multitask_model() -> Optional[str]:
@@ -218,7 +219,11 @@ def extract_semantic_frame(
         debug["scores"] = {}
         debug["ranked"] = []
         debug["structure_model"] = _pick_structure_model()
-        debug["ner_model"] = _pick_ner_model()
+        try:
+            debug["ner_model"] = _pick_ner_model()
+        except RuntimeError as ex:
+            debug["ner_model_error"] = str(ex)
+            debug["ner_model"] = None
         debug["multitask_model"] = _pick_multitask_model()
         debug["inference_backend"] = "deferred_non_english"
         debug["input_text"] = text
@@ -229,7 +234,11 @@ def extract_semantic_frame(
         return frame, debug
 
     structure_model = _pick_structure_model()
-    ner_model = _pick_ner_model()
+    try:
+        ner_model = _pick_ner_model()
+    except RuntimeError as ex:
+        ner_model = None
+        debug["ner_model_error"] = str(ex)
     multitask_model = _pick_multitask_model()
     used_backend = "candidate_graph_solver"
     mt_entities: Dict[str, str] = {}
@@ -245,10 +254,10 @@ def extract_semantic_frame(
             mt_entities = dict(mt.get("entities", {}))
             used_backend = "candidate_graph_solver+multitask_entities"
         except Exception as ex:
-            params = extract_params(normalized_text, ner_model, device)
+            params = extract_params(normalized_text, ner_model, device) if ner_model else {}
             debug["multitask_error"] = str(ex)
     else:
-        params = extract_params(normalized_text, ner_model, device)
+        params = extract_params(normalized_text, ner_model, device) if ner_model else {}
     params, notes = merge_params(normalized_text, params)
     graph_result = search_candidate_graphs(
         normalized_text,

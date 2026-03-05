@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,7 @@ from core.audit.audit_log import append_audit_entry
 from core.config.defaults import build_strict_default_config
 from core.config.field_registry import friendly_label
 from core.config.phase_registry import phase_title
+from core.dialogue.grounding import enforce_message_grounding
 from core.dialogue.policy import decide_dialogue_action
 from core.dialogue.renderer import render_dialogue_message
 from core.dialogue.state import build_raw_dialogue, collect_available_explanations, sync_dialogue_state
@@ -141,6 +143,14 @@ def _apply_explicit_user_controls(
     intent = user_candidate.intent
     if explicit_intent in {Intent.CONFIRM, Intent.MODIFY, Intent.REMOVE, Intent.QUESTION}:
         intent = explicit_intent
+    elif (
+        explicit_intent == Intent.SET
+        and explicit_targets
+        and user_candidate.intent in {Intent.QUESTION, Intent.OTHER}
+    ):
+        # Deterministic control parser can downgrade spurious LLM question intent
+        # when clear set-targets are present in the same turn.
+        intent = Intent.SET
     elif user_candidate.intent == Intent.OTHER:
         intent = explicit_intent
     target_paths = explicit_targets or list(user_candidate.target_paths)
@@ -301,6 +311,75 @@ def _pending_item_from_update(
         "new": update.value,
         "producer": producer,
     }
+
+
+def _match_choice(text: str, options: list[str]) -> str | None:
+    low = (text or "").lower()
+    ordered = sorted((str(x) for x in options if str(x)), key=len, reverse=True)
+    for item in ordered:
+        pat = rf"(?<![A-Za-z0-9_]){item.lower()}(?![A-Za-z0-9_])"
+        if re.search(pat, low):
+            return item
+    return None
+
+
+def _build_forced_explicit_candidate(
+    *,
+    text: str,
+    normalized_text: str,
+    user_candidate: CandidateUpdate,
+    turn_id: int,
+) -> CandidateUpdate | None:
+    merged = f"{text} ; {normalized_text}".strip(" ;")
+    updates: list[UpdateOp] = []
+
+    should_try_physics = (
+        user_candidate.intent in {Intent.SET, Intent.MODIFY}
+        or "physics.physics_list" in user_candidate.target_paths
+    )
+    if should_try_physics:
+        physics_list = _match_choice(merged, KNOWLEDGE["physics_lists"])
+        if physics_list:
+            updates.append(
+                UpdateOp(
+                    path="physics.physics_list",
+                    op="set",
+                    value=physics_list,
+                    producer=Producer.USER_EXPLICIT,
+                    confidence=1.0,
+                    turn_id=turn_id,
+                )
+            )
+
+    output_formats = ["root", "csv", "hdf5", "xml", "json"]
+    should_try_output = (
+        user_candidate.intent in {Intent.SET, Intent.MODIFY}
+        or "output.format" in user_candidate.target_paths
+    )
+    if should_try_output:
+        output_fmt = _match_choice(merged, output_formats)
+        if output_fmt:
+            updates.append(
+                UpdateOp(
+                    path="output.format",
+                    op="set",
+                    value=output_fmt,
+                    producer=Producer.USER_EXPLICIT,
+                    confidence=1.0,
+                    turn_id=turn_id,
+                )
+            )
+
+    if not updates:
+        return None
+    return CandidateUpdate(
+        producer=Producer.USER_EXPLICIT,
+        intent=Intent.SET,
+        target_paths=sorted({u.path for u in updates}),
+        updates=updates,
+        confidence=1.0,
+        rationale="forced_explicit_text_choice",
+    )
 def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: float = 0.6, lang: str = "zh") -> dict:
     text = str(payload.get("text", "")).strip()
     if not text:
@@ -482,6 +561,16 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         ]
 
     candidates: list[CandidateUpdate] = list(content_candidates)
+    forced_explicit = _build_forced_explicit_candidate(
+        text=text,
+        normalized_text=normalized_text,
+        user_candidate=user_candidate,
+        turn_id=state.turn_id,
+    )
+    if forced_explicit is not None:
+        candidates.append(forced_explicit)
+
+    allow_recommender = "physics.physics_list" not in set(user_candidate.target_paths)
     reco_candidate = recommend_physics_list(
         text,
         normalized_text,
@@ -490,7 +579,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         turn_id=state.turn_id,
         config_path=ollama_config_path,
     )
-    if reco_candidate is not None:
+    if allow_recommender and reco_candidate is not None:
         candidates.append(reco_candidate)
 
     pending_conflict_rejected: list[dict[str, Any]] = []
@@ -661,6 +750,12 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         user_temperature=user_temperature,
         dialogue_summary=dialogue_summary,
         raw_dialogue=raw_dialogue_before_reply,
+    )
+    question = enforce_message_grounding(
+        question,
+        config=state.config,
+        action=dialogue_decision.action.value,
+        lang=lang,
     )
     state.last_dialogue_action = dialogue_decision.action.value
     state.history.append({"role": "assistant", "content": question})

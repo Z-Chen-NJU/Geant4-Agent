@@ -604,6 +604,44 @@ class SmokeNoOllamaTest(unittest.TestCase):
         self.assertNotIn(("geometry.params.module_x", "bert_extractor"), rejected_paths)
         self.assertIsNone(out.get("config", {}).get("source", {}).get("energy"))
 
+    def test_explicit_physics_choice_blocks_recommender_override(self) -> None:
+        sid = "explicit-physics-choice"
+        reset_session(sid)
+        with patch(
+            "core.orchestrator.session_manager.recommend_physics_list",
+            return_value=CandidateUpdate(
+                producer=Producer.LLM_RECOMMENDER,
+                intent=Intent.SET,
+                target_paths=["physics.physics_list"],
+                updates=[
+                    UpdateOp(
+                        path="physics.physics_list",
+                        op="set",
+                        value="FTFP_BERT",
+                        producer=Producer.LLM_RECOMMENDER,
+                        confidence=0.8,
+                        turn_id=1,
+                    )
+                ],
+                confidence=0.8,
+                rationale="forced_test_recommender",
+            ),
+        ):
+            out = process_turn(
+                {
+                    "session_id": sid,
+                    "text": "Use physics list QBBC and output root.",
+                    "llm_router": False,
+                    "llm_question": False,
+                    "normalize_input": False,
+                },
+                ollama_config_path="",
+                lang="en",
+            )
+        self.assertEqual(out.get("config", {}).get("physics", {}).get("physics_list"), "QBBC")
+        rejected_producers = {item.get("producer") for item in out.get("rejected_updates", [])}
+        self.assertNotIn("llm_recommender", rejected_producers)
+
 
 if __name__ == "__main__":
     unittest.main()

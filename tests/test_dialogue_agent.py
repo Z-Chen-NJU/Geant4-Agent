@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from core.dialogue.policy import decide_dialogue_action
 from core.dialogue.renderer import render_dialogue_message
@@ -240,6 +241,53 @@ class DialogueAgentTest(unittest.TestCase):
         )
         self.assertIn("Geometry: updated geometry structure.", msg)
         self.assertIn("Source: still needs source energy.", msg)
+
+    def test_renderer_naturalizes_non_clarification_when_llm_enabled(self) -> None:
+        decision = decide_dialogue_action(
+            user_intent="SET",
+            is_complete=True,
+            asked_fields=[],
+            missing_fields=[],
+            updated_paths=["geometry.structure"],
+            answered_this_turn=[],
+        )
+        with mock.patch("core.dialogue.renderer.render_naturalized_response", return_value="Naturalized!") as mocked:
+            msg = render_dialogue_message(
+                decision,
+                lang="en",
+                use_llm_question=True,
+                ollama_config="nlu/bert_lab/configs/ollama_config.json",
+                user_temperature=1.0,
+                dialogue_summary={},
+                raw_dialogue=[{"role": "user", "content": "build a box"}],
+            )
+        self.assertEqual(msg, "Naturalized!")
+        mocked.assert_called_once()
+
+    def test_renderer_skips_naturalization_for_clarification_turns(self) -> None:
+        decision = decide_dialogue_action(
+            user_intent="SET",
+            is_complete=False,
+            asked_fields=["source.energy"],
+            missing_fields=["source.energy"],
+            updated_paths=[],
+            answered_this_turn=[],
+        )
+        with mock.patch("core.dialogue.renderer.render_question", return_value="Please provide source energy.") as mocked_q, mock.patch(
+            "core.dialogue.renderer.render_naturalized_response"
+        ) as mocked_nat:
+            msg = render_dialogue_message(
+                decision,
+                lang="en",
+                use_llm_question=True,
+                ollama_config="nlu/bert_lab/configs/ollama_config.json",
+                user_temperature=1.0,
+                dialogue_summary={},
+                raw_dialogue=[],
+            )
+        self.assertEqual(msg, "Please provide source energy.")
+        mocked_q.assert_called_once()
+        mocked_nat.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from planner.agent import ask_missing
+from planner.agent import ask_missing, naturalize_response
 
 
 def render_question(
@@ -17,3 +17,31 @@ def render_question(
         temperature=temperature,
     )
 
+
+def render_naturalized_response(
+    base_message: str,
+    *,
+    lang: str,
+    action: str,
+    updated_paths: list[str],
+    missing_fields: list[str],
+    asked_fields: list[str],
+    overwrite_preview: list[dict] | None,
+    dialogue_summary: dict | None,
+    raw_dialogue: list[dict] | None,
+    ollama_config: str,
+    temperature: float,
+) -> str:
+    return naturalize_response(
+        base_message,
+        lang=lang,
+        action=action,
+        updated_paths=updated_paths,
+        missing_fields=missing_fields,
+        asked_fields=asked_fields,
+        overwrite_preview=overwrite_preview,
+        dialogue_summary=dialogue_summary,
+        raw_dialogue=raw_dialogue,
+        ollama_config=ollama_config,
+        temperature=temperature,
+    )

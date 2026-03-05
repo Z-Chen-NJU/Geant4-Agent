@@ -3,7 +3,7 @@ from __future__ import annotations
 from core.config.field_registry import friendly_labels
 from core.config.prompt_registry import clarification_fallback, completion_message
 from core.dialogue.types import DialogueAction, DialogueDecision
-from planner.question_renderer import render_question
+from planner.question_renderer import render_naturalized_response, render_question
 
 
 def _render_update_status(decision: DialogueDecision, *, lang: str) -> str:
@@ -122,13 +122,33 @@ def render_dialogue_message(
     ollama_config: str,
     user_temperature: float,
     dialogue_summary: dict | None = None,
+    raw_dialogue: list[dict] | None = None,
 ) -> str:
+    def _maybe_naturalize(text: str) -> str:
+        if not use_llm_question or not text:
+            return text
+        if decision.action == DialogueAction.ASK_CLARIFICATION:
+            return text
+        return render_naturalized_response(
+            text,
+            lang=lang,
+            action=decision.action.value,
+            updated_paths=decision.updated_paths,
+            missing_fields=decision.missing_fields,
+            asked_fields=decision.asked_fields,
+            overwrite_preview=decision.overwrite_preview,
+            dialogue_summary=dialogue_summary,
+            raw_dialogue=raw_dialogue,
+            ollama_config=ollama_config,
+            temperature=user_temperature,
+        )
+
     if decision.action == DialogueAction.FINALIZE:
-        return completion_message(lang)
+        return _maybe_naturalize(completion_message(lang))
     if decision.action == DialogueAction.CONFIRM_OVERWRITE:
-        return _render_overwrite_confirmation(decision, lang=lang)
+        return _maybe_naturalize(_render_overwrite_confirmation(decision, lang=lang))
     if decision.action == DialogueAction.EXPLAIN_CHOICE:
-        return _render_choice_explanation(decision, lang=lang, dialogue_summary=dialogue_summary)
+        return _maybe_naturalize(_render_choice_explanation(decision, lang=lang, dialogue_summary=dialogue_summary))
     if decision.action == DialogueAction.ASK_CLARIFICATION:
         if use_llm_question:
             return render_question(
@@ -142,7 +162,7 @@ def render_dialogue_message(
         summary = dialogue_summary or {}
         grouped = _render_grouped_progress(summary, lang=lang)
         if grouped:
-            return grouped
+            return _maybe_naturalize(grouped)
         updated = summary.get("updated_fields") or friendly_labels(decision.updated_paths[:3], lang)
         pending = summary.get("pending_fields") or friendly_labels(decision.missing_fields[:2], lang)
         recent = summary.get("recent_confirmed") or []
@@ -154,7 +174,7 @@ def render_dialogue_message(
                 parts.append(f"\u5f53\u524d\u5df2\u786e\u8ba4\uff1a{', '.join(recent[:3])}\u3002")
             if pending:
                 parts.append(f"\u4ecd\u9700\u8865\u5145\uff1a{', '.join(pending[:2])}\u3002")
-            return "".join(parts) or "\u5f53\u524d\u914d\u7f6e\u6b63\u5728\u6536\u655b\u3002"
+            return _maybe_naturalize("".join(parts) or "\u5f53\u524d\u914d\u7f6e\u6b63\u5728\u6536\u655b\u3002")
         parts = []
         if updated:
             parts.append(f"Updated this turn: {', '.join(updated)}.")
@@ -162,7 +182,7 @@ def render_dialogue_message(
             parts.append(f"Confirmed so far: {', '.join(recent[:3])}.")
         if pending:
             parts.append(f"Still needed: {', '.join(pending[:2])}.")
-        return " ".join(parts) or "Configuration is converging."
+        return _maybe_naturalize(" ".join(parts) or "Configuration is converging.")
     if decision.action in {DialogueAction.CONFIRM_UPDATE, DialogueAction.ANSWER_STATUS}:
-        return _render_update_status(decision, lang=lang)
-    return completion_message(lang)
+        return _maybe_naturalize(_render_update_status(decision, lang=lang))
+    return _maybe_naturalize(completion_message(lang))

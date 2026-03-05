@@ -642,7 +642,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         last_dialogue_action=state.last_dialogue_action,
     )
     dialogue_trace = build_dialogue_trace(dialogue_decision)
-    dialogue_summary, _, dialogue_memory = sync_dialogue_state(
+    dialogue_summary, raw_dialogue_before_reply, dialogue_memory = sync_dialogue_state(
         state,
         decision=dialogue_decision,
         lang=lang,
@@ -655,6 +655,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         ollama_config=ollama_config_path,
         user_temperature=user_temperature,
         dialogue_summary=dialogue_summary,
+        raw_dialogue=raw_dialogue_before_reply,
     )
     state.last_dialogue_action = dialogue_decision.action.value
     state.history.append({"role": "assistant", "content": question})

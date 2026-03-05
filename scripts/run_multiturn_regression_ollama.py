@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import urllib.request
 from datetime import date
@@ -101,22 +102,69 @@ def _deep_get(cfg: dict[str, Any], path: str) -> Any:
     return cur
 
 
-def _probe_provider(provider: str, base_url: str, chat_path: str | None = None) -> dict[str, Any]:
-    provider = (provider or "ollama").lower()
+def _resolve_auth_token(cfg: Any) -> str:
+    if getattr(cfg, "api_key", None):
+        return str(cfg.api_key)
+    if getattr(cfg, "api_key_env", None):
+        return os.getenv(str(cfg.api_key_env), "").strip()
+    for env_name in ("LLM_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY"):
+        token = os.getenv(env_name, "").strip()
+        if token:
+            return token
+    return ""
+
+
+def _request_json(url: str, timeout_s: int, token: str = "") -> dict[str, Any]:
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _probe_provider(cfg: Any) -> dict[str, Any]:
+    provider = str(getattr(cfg, "provider", "ollama") or "ollama").lower()
+    base_url = str(getattr(cfg, "base_url", "")).rstrip("/")
+    timeout_s = int(getattr(cfg, "timeout_s", 8) or 8)
+    token = _resolve_auth_token(cfg)
+
+    candidate_urls: list[str]
     if provider in OPENAI_COMPAT_PROVIDERS:
-        url = base_url.rstrip("/") + (chat_path or "/v1/models")
+        # Try common OpenAI-compatible model listing endpoints.
+        candidate_urls = [f"{base_url}/v1/models", f"{base_url}/models"]
     else:
-        url = base_url.rstrip("/") + "/api/tags"
-    try:
-        with urllib.request.urlopen(url, timeout=8) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-        if provider in OPENAI_COMPAT_PROVIDERS:
-            models = [str(x.get("id", "")) for x in payload.get("data", []) if str(x.get("id", ""))]
-        else:
-            models = [str(x.get("name", "")) for x in payload.get("models", []) if str(x.get("name", ""))]
-        return {"ok": True, "base_url": base_url, "model_count": len(models), "models": models[:10], "error": ""}
-    except Exception as ex:
-        return {"ok": False, "base_url": base_url, "model_count": 0, "models": [], "error": str(ex)}
+        candidate_urls = [f"{base_url}/api/tags"]
+
+    errors: list[str] = []
+    for url in candidate_urls:
+        try:
+            payload = _request_json(url, timeout_s=timeout_s, token=token)
+            if provider in OPENAI_COMPAT_PROVIDERS:
+                models = [str(x.get("id", "")) for x in payload.get("data", []) if str(x.get("id", ""))]
+            else:
+                models = [str(x.get("name", "")) for x in payload.get("models", []) if str(x.get("name", ""))]
+            return {
+                "ok": True,
+                "base_url": base_url,
+                "provider": provider,
+                "model_count": len(models),
+                "models": models[:10],
+                "probe_url": url,
+                "error": "",
+            }
+        except Exception as ex:
+            errors.append(f"{url} -> {ex}")
+
+    return {
+        "ok": False,
+        "base_url": base_url,
+        "provider": provider,
+        "model_count": 0,
+        "models": [],
+        "probe_url": candidate_urls[0] if candidate_urls else "",
+        "error": " | ".join(errors),
+    }
 
 
 def _naturalness_stats(messages: list[str]) -> dict[str, Any]:
@@ -295,7 +343,7 @@ def main() -> None:
     args = parser.parse_args()
 
     cfg = load_config(args.config)
-    conn = _probe_provider(cfg.provider, cfg.base_url, cfg.chat_path)
+    conn = _probe_provider(cfg)
     results = [_run_case(c, ollama_config=args.config, min_confidence=args.min_confidence, lang=args.lang) for c in _cases()]
     summary = _aggregate(results)
 

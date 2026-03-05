@@ -129,6 +129,7 @@ nlu/bert_lab/models/
 nlu/bert_lab/data/eval/*.json
 nlu/bert_lab/data/eval/*_report.json
 nlu/bert_lab/configs/_tmp.json
+nlu/bert_lab/configs/*.local.json
 nlu/bert_lab/data/controlled_*.jsonl
 nlu/bert_lab/data/controlled_corpus_summary.json
 nlu/bert_lab/data/audit_report.json

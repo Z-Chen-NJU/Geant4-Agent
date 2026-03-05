@@ -4,6 +4,7 @@ const state = {
   sessionId: localStorage.getItem("g4_session_id") || "",
   lang: localStorage.getItem("g4_lang") || "zh",
   ollamaConfigPath: localStorage.getItem("g4_ollama_config_path") || "",
+  llmProvider: "",
   ollamaModel: "",
   modelPreflight: null,
   lastMeta: null,
@@ -18,6 +19,7 @@ const i18n = {
     input_label: "请描述你的实验设想",
     input_placeholder: "例如：我想用gamma打一个铜立方体，看看能量沉积...",
     model_label: "LLM 配置",
+    provider_label: "供应商",
     lang_label: "Language",
     min_conf: "结构置信度阈值",
     autofix: "自动修正",
@@ -59,6 +61,7 @@ const i18n = {
     input_label: "Describe your experiment",
     input_placeholder: "e.g., shoot gamma at a copper cube and observe energy deposition...",
     model_label: "LLM Config",
+    provider_label: "Provider",
     lang_label: "Language",
     min_conf: "Structure confidence threshold",
     autofix: "Auto-fix",
@@ -145,7 +148,7 @@ function summarizeConfig(cfg) {
     `${t.phase}: ${meta.phase_title ?? t.unknown}`,
     `${t.complete}: ${meta.is_complete ? "true" : "false"}`,
     `${t.asked}: ${(meta.asked_fields_friendly || []).join(", ") || t.missing}`,
-    `LLM: ${state.ollamaModel || t.unknown}`,
+    `LLM: ${(state.llmProvider ? state.llmProvider + " / " : "") + (state.ollamaModel || t.unknown)}`,
     `${t.geometry_structure}: ${geomLabel}`,
     `${t.geometry_feasible}: ${cfg.geometry?.feasible ?? t.undefined}`,
     `${t.materials}: ${(cfg.materials?.selected_materials || []).join(", ") || t.missing}`,
@@ -193,7 +196,8 @@ async function loadRuntimeConfigs() {
   available.forEach((item) => {
     const opt = document.createElement("option");
     opt.value = item.path;
-    opt.textContent = `${item.model} (${item.path.split("/").pop()})`;
+    const provider = item.provider || "ollama";
+    opt.textContent = `${provider} / ${item.model} (${item.path.split("/").pop()})`;
     sel.appendChild(opt);
   });
 
@@ -202,6 +206,7 @@ async function loadRuntimeConfigs() {
     sel.value = preferred;
   }
   state.ollamaModel = data.current_model || "";
+  state.llmProvider = data.current_provider || "";
   state.ollamaConfigPath = sel.value || "";
   state.modelPreflight = data.model_preflight || null;
   renderRuntimeNotice();
@@ -222,6 +227,7 @@ async function applyRuntimeConfig(path) {
   }
   state.ollamaConfigPath = data.current_path || path;
   state.ollamaModel = data.current_model || "";
+  state.llmProvider = data.current_provider || "";
   state.modelPreflight = data.model_preflight || null;
   localStorage.setItem("g4_ollama_config_path", state.ollamaConfigPath);
   renderRuntimeNotice();
@@ -319,7 +325,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!nextPath) return;
       try {
         await applyRuntimeConfig(nextPath);
-        addMessage("assistant", `LLM config switched: ${state.ollamaModel}`);
+        addMessage("assistant", `LLM config switched: ${state.llmProvider || "provider"} / ${state.ollamaModel}`);
         if ($("summary").textContent) {
           try {
             const cfg = JSON.parse($("response").textContent || "{}");

@@ -119,6 +119,7 @@ def main() -> None:
     print(f'Serving on http://{host}:{port}')
     print(
         'Ollama runtime:',
+        f"provider={runtime.get('current_provider', '')};",
         f"path={runtime.get('current_path', '')};",
         f"model={runtime.get('current_model', '')};",
         f"base_url={runtime.get('current_base_url', '')}",

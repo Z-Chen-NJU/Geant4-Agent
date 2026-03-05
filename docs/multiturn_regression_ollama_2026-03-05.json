@@ -1,6 +1,7 @@
 {
   "run_config": {
     "config_path": "nlu/bert_lab/configs/ollama_config.json",
+    "provider": "ollama",
     "base_url": "http://localhost:11434",
     "model": "qwen3:14b",
     "min_confidence": 0.6,

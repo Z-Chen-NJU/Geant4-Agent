@@ -42,11 +42,14 @@ def runtime_config_payload() -> dict[str, Any]:
     items: list[dict[str, Any]] = []
     if OLLAMA_CONFIG_DIR.exists():
         for p in sorted(OLLAMA_CONFIG_DIR.glob("*.json")):
+            if p.name.endswith(".example.json"):
+                continue
             try:
                 cfg = load_config(p)
                 items.append(
                     {
                         "path": str(p).replace("\\", "/"),
+                        "provider": cfg.provider,
                         "model": cfg.model,
                         "base_url": cfg.base_url,
                         "timeout_s": cfg.timeout_s,
@@ -59,17 +62,21 @@ def runtime_config_payload() -> dict[str, Any]:
     p = Path(current_raw)
     if p.exists():
         current_path = str(p.resolve()).replace("\\", "/")
+    current_provider = ""
     current_model = ""
     current_base = ""
     try:
         cur = load_config(p if p.exists() else current_raw)
+        current_provider = cur.provider
         current_model = cur.model
         current_base = cur.base_url
     except Exception:
+        current_provider = ""
         pass
     model_preflight = runtime_model_readiness()
     return {
         "current_path": current_path,
+        "current_provider": current_provider,
         "current_model": current_model,
         "current_base_url": current_base,
         "available": items,

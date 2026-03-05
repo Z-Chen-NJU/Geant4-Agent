@@ -71,6 +71,20 @@ python ui/web/server.py
 Then open:
 - http://127.0.0.1:8088
 
+## LLM Provider Config (Ollama / OpenAI-Compatible)
+
+The project now supports multiple LLM backends through config files:
+
+- `provider=ollama` (default): uses `POST /api/generate`
+- `provider=openai_compatible` (also supports aliases like `deepseek`): uses `POST /v1/chat/completions`
+
+Example configs:
+- `nlu/bert_lab/configs/ollama_config.json`
+- `nlu/bert_lab/configs/openai_compatible_config.example.json`
+- `nlu/bert_lab/configs/deepseek_api_config.example.json`
+
+To use API-key based providers, set `api_key` or `api_key_env` in the config.
+
 ## Current Limitations
 
 - **No full Geant4 runtime config**: schema exists, but no full generator of G4 macro or C++ config.
@@ -154,6 +168,20 @@ python ui/web/server.py
 
 然后访问：
 - http://127.0.0.1:8088
+
+## LLM 提供方配置（Ollama / OpenAI 兼容）
+
+项目现已支持多种 LLM 后端配置：
+
+- `provider=ollama`（默认）：调用 `POST /api/generate`
+- `provider=openai_compatible`（也支持 `deepseek` 等别名）：调用 `POST /v1/chat/completions`
+
+示例配置文件：
+- `nlu/bert_lab/configs/ollama_config.json`
+- `nlu/bert_lab/configs/openai_compatible_config.example.json`
+- `nlu/bert_lab/configs/deepseek_api_config.example.json`
+
+如需 API Key 模式，可在配置中设置 `api_key` 或 `api_key_env`。
 
 ## 当前限制
 

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from core.orchestrator.session_manager import process_turn, reset_session
+from nlu.bert_lab.ollama_client import OPENAI_COMPAT_PROVIDERS
 from nlu.bert_lab.ollama_client import load_config
 
 
@@ -100,12 +101,19 @@ def _deep_get(cfg: dict[str, Any], path: str) -> Any:
     return cur
 
 
-def _probe_ollama(base_url: str) -> dict[str, Any]:
-    tags_url = base_url.rstrip("/") + "/api/tags"
+def _probe_provider(provider: str, base_url: str, chat_path: str | None = None) -> dict[str, Any]:
+    provider = (provider or "ollama").lower()
+    if provider in OPENAI_COMPAT_PROVIDERS:
+        url = base_url.rstrip("/") + (chat_path or "/v1/models")
+    else:
+        url = base_url.rstrip("/") + "/api/tags"
     try:
-        with urllib.request.urlopen(tags_url, timeout=8) as resp:
+        with urllib.request.urlopen(url, timeout=8) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
-        models = [str(x.get("name", "")) for x in payload.get("models", []) if str(x.get("name", ""))]
+        if provider in OPENAI_COMPAT_PROVIDERS:
+            models = [str(x.get("id", "")) for x in payload.get("data", []) if str(x.get("id", ""))]
+        else:
+            models = [str(x.get("name", "")) for x in payload.get("models", []) if str(x.get("name", ""))]
         return {"ok": True, "base_url": base_url, "model_count": len(models), "models": models[:10], "error": ""}
     except Exception as ex:
         return {"ok": False, "base_url": base_url, "model_count": 0, "models": [], "error": str(ex)}
@@ -237,6 +245,7 @@ def _to_md(config: dict[str, Any], conn: dict[str, Any], summary: dict[str, Any]
     lines.append("")
     lines.append("## 运行配置")
     lines.append(f"- config_path: {config.get('config_path')}")
+    lines.append(f"- provider: {config.get('provider')}")
     lines.append(f"- base_url: {config.get('base_url')}")
     lines.append(f"- model: {config.get('model')}")
     lines.append(f"- min_confidence: {config.get('min_confidence')}")
@@ -286,7 +295,7 @@ def main() -> None:
     args = parser.parse_args()
 
     cfg = load_config(args.config)
-    conn = _probe_ollama(cfg.base_url)
+    conn = _probe_provider(cfg.provider, cfg.base_url, cfg.chat_path)
     results = [_run_case(c, ollama_config=args.config, min_confidence=args.min_confidence, lang=args.lang) for c in _cases()]
     summary = _aggregate(results)
 
@@ -296,6 +305,7 @@ def main() -> None:
     payload = {
         "run_config": {
             "config_path": args.config,
+            "provider": cfg.provider,
             "base_url": cfg.base_url,
             "model": cfg.model,
             "min_confidence": args.min_confidence,
@@ -316,4 +326,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

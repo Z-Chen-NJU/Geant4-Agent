@@ -91,7 +91,7 @@
           "required": ["type", "value"]
         }
       },
-      "required": ["particle", "energy_MeV", "position", "direction"],
+      "required": ["particle", "energy_MeV", "position"],
       "additionalProperties": true
     },
     "output": {

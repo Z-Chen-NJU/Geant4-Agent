@@ -48,6 +48,15 @@ class MaterialAliasTest(unittest.TestCase):
         )
         self.assertEqual(out.get("config", {}).get("materials", {}).get("selected_materials"), ["G4_CESIUM_IODIDE"])
 
+    def test_chinese_cesium_iodide_alias_maps_to_g4_cesium_iodide(self) -> None:
+        sid = "material-alias-csi-zh"
+        reset_session(sid)
+        out = _turn(
+            sid,
+            "材料 碘化铯；3 x 3 盒体阵列，每个模块 12 mm x 12 mm x 3 mm，pitch_x 15 mm，pitch_y 15 mm，间隙 1 mm；点源 gamma 0.662 MeV，位置 (0,0,-90) mm，方向 +z；物理列表 QBBC；输出 root。",
+        )
+        self.assertEqual(out.get("config", {}).get("materials", {}).get("selected_materials"), ["G4_CESIUM_IODIDE"])
+
     def test_change_to_lead_without_material_keyword_still_requests_overwrite(self) -> None:
         sid = "material-target-hint-lead"
         reset_session(sid)

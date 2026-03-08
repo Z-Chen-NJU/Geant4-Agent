@@ -100,6 +100,7 @@ _MATERIAL_ALIASES = {
     "cesium iodide": "G4_CESIUM_IODIDE",
     "caesium iodide": "G4_CESIUM_IODIDE",
     "csi": "G4_CESIUM_IODIDE",
+    "碘化铯": "G4_CESIUM_IODIDE",
     "g4_csi": "G4_CESIUM_IODIDE",
     "g4_cesium_iodide": "G4_CESIUM_IODIDE",
     "g4_cesium-iodide": "G4_CESIUM_IODIDE",
@@ -315,6 +316,78 @@ def _canonical_particle(value: Any) -> str | None:
 
 def _canonical_output_format(value: Any) -> str | None:
     return canonical_output_format(_clean_scalar(value))
+
+
+def _extract_explicit_material(text: str) -> str | None:
+    low = text.lower()
+    for alias, canonical in _MATERIAL_ALIASES.items():
+        alias_low = alias.lower()
+        if re.search(r"[A-Za-z0-9_]", alias_low):
+            if re.search(rf"(?<![A-Za-z0-9_]){re.escape(alias_low)}(?![A-Za-z0-9_])", low):
+                return canonical
+        elif alias in text:
+            return canonical
+    return None
+
+
+def _extract_explicit_source_kind(text: str) -> str | None:
+    low = text.lower()
+    if any(token in low for token in ("isotropic", "各向同性")):
+        return "isotropic"
+    if re.search(r"(?<![A-Za-z0-9_])beam(?![A-Za-z0-9_])", low) or "束流" in text:
+        return "beam"
+    if re.search(r"(?<![A-Za-z0-9_])point source(?![A-Za-z0-9_])", low) or re.search(
+        r"(?<![A-Za-z0-9_])point(?![A-Za-z0-9_])", low
+    ) or "点源" in text:
+        return "point"
+    if re.search(r"(?<![A-Za-z0-9_])plane(?: source)?(?![A-Za-z0-9_])", low) or "面源" in text:
+        return "plane"
+    return None
+
+
+def _has_unknown_material_marker(text: str) -> bool:
+    low = text.lower()
+    return bool(
+        re.search(r"(?:材料|material)\s*[:：]?\s*[?？]+", text)
+        or re.search(r"(?:材料|material)\s*(?:unknown|tbd|unspecified)\b", low)
+    )
+
+
+def _has_graph_family_cue(text: str) -> bool:
+    low = text.lower()
+    return any(
+        token in low
+        for token in (
+            "ring",
+            "annulus",
+            "circular array",
+            "grid",
+            "array",
+            "matrix",
+            "stack",
+            "layers",
+            "shell",
+            "concentric",
+            "coaxial",
+            "nest",
+            "inside",
+            "contains",
+            "boolean",
+            "union",
+            "subtraction",
+            "intersection",
+            "阵列",
+            "二维阵列",
+            "探测板",
+            "堆叠",
+            "同心",
+            "嵌套",
+            "布尔",
+            "并集",
+            "减法",
+            "相交",
+        )
+    )
 
 
 def _present_slot_paths(frame: SlotFrame) -> set[str]:
@@ -1187,28 +1260,18 @@ def _backfill_from_user_text(frame: SlotFrame, user_text: str) -> None:
             frame.geometry.tilt_y_deg = float(m.group(1))
             frame.geometry.kind = frame.geometry.kind or "cuttubs"
 
-    if frame.materials.primary is None:
-        for alias, canonical in _MATERIAL_ALIASES.items():
-            alias_low = alias.lower()
-            if re.search(r"[A-Za-z0-9_]", alias_low):
-                if re.search(rf"(?<![A-Za-z0-9_]){re.escape(alias_low)}(?![A-Za-z0-9_])", low):
-                    frame.materials.primary = canonical
-                    break
-            else:
-                if alias in text:
-                    frame.materials.primary = canonical
-                    break
+    explicit_material = _extract_explicit_material(text)
+    if explicit_material is not None:
+        frame.materials.primary = explicit_material
+    elif _has_unknown_material_marker(text):
+        frame.materials.primary = None
 
-    if frame.source.kind is None:
-        def _contains_word(token: str) -> bool:
-            return re.search(rf"(?<![A-Za-z0-9_]){re.escape(token)}(?![A-Za-z0-9_])", low) is not None
+    explicit_source_kind = _extract_explicit_source_kind(text)
+    if explicit_source_kind is not None:
+        frame.source.kind = explicit_source_kind
 
-        if any(token in low for token in ("isotropic", "各向同性")):
-            frame.source.kind = "isotropic"
-        elif _contains_word("beam") or ("束流" in text):
-            frame.source.kind = "beam"
-        elif (_contains_word("point source") or _contains_word("point")) or ("点源" in text):
-            frame.source.kind = "point"
+    if _has_graph_family_cue(text):
+        frame.geometry.kind = None
 
     if frame.source.particle is None:
         for token, canonical in _PARTICLE_ALIASES.items():
@@ -1425,6 +1488,8 @@ def build_llm_slot_frame(
     _normalize_inferred_slots(frame)
     stage_trace["pruned_unresolved_targets"] = _prune_unresolved_targets(frame, user_text)
     _normalize_inferred_slots(frame)
+    if _has_graph_family_cue(user_text):
+        frame.geometry.kind = None
     raw_after = _present_slot_paths(frame)
     stage_trace["raw_text_backfill_fields"] = sorted(raw_after - raw_before)
     stage_trace["repair_used"] = bool(stage_trace["normalized_backfill_fields"] or stage_trace["raw_text_backfill_fields"])

@@ -50,6 +50,68 @@ class LlmSlotFrameTest(unittest.TestCase):
         self.assertEqual(frame.source.direction_vec, [0.0, 0.0, 1.0])
         self.assertEqual(frame.output.format, "root")
 
+    def test_build_llm_slot_frame_prefers_explicit_material_from_user_text(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 1.0,
+            "normalized_text": "set material to copper; set geometry to grid",
+            "target_slots": ["geometry.kind", "materials.primary"],
+            "slots": {
+                "geometry": {"kind": "grid"},
+                "materials": {"primary": "G4_Cu"},
+            },
+        }
+        with patch("nlu.llm.slot_frame.chat", return_value={"response": f"```json\n{json.dumps(payload)}\n```"}):
+            result = build_llm_slot_frame(
+                "设成 4 x 3 的盒体阵列，材料 硅；点源 gamma 0.511 MeV，方向 +z。",
+                context_summary="",
+                config_path="",
+            )
+        self.assertTrue(result.ok)
+        assert result.frame is not None
+        self.assertEqual(result.frame.materials.primary, "G4_Si")
+
+    def test_build_llm_slot_frame_prefers_explicit_beam_from_user_text(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 1.0,
+            "normalized_text": "set source kind to point",
+            "target_slots": ["source.kind"],
+            "slots": {
+                "source": {"kind": "point"},
+            },
+        }
+        with patch("nlu.llm.slot_frame.chat", return_value={"response": f"```json\n{json.dumps(payload)}\n```"}):
+            result = build_llm_slot_frame(
+                "请创建完整布尔配置，材料 铝；束流 gamma 0.5 MeV，位置 (0,0,-70) mm，方向 +z。",
+                context_summary="",
+                config_path="",
+            )
+        self.assertTrue(result.ok)
+        assert result.frame is not None
+        self.assertEqual(result.frame.source.kind, "beam")
+
+    def test_build_llm_slot_frame_clears_primitive_geometry_when_graph_family_is_explicit(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 1.0,
+            "normalized_text": "geometry kind is box; geometry size triplet mm is [12,12,3]",
+            "target_slots": ["geometry.kind", "geometry.size_triplet_mm"],
+            "slots": {
+                "geometry": {"kind": "box", "size_triplet_mm": [12, 12, 3]},
+            },
+        }
+        with patch("nlu.llm.slot_frame.chat", return_value={"response": f"```json\n{json.dumps(payload)}\n```"}):
+            result = build_llm_slot_frame(
+                "请创建完整的阵列配置：3 x 3 盒体阵列，每个模块 12 mm x 12 mm x 3 mm。",
+                context_summary="",
+                config_path="",
+            )
+        self.assertTrue(result.ok)
+        assert result.frame is not None
+        self.assertIsNone(result.frame.geometry.kind)
+        self.assertEqual(result.frame.geometry.size_triplet_mm, [12.0, 12.0, 3.0])
+
     def test_slot_mapper_translates_slot_targets_to_config_targets(self) -> None:
         payload = {
             "intent": "MODIFY",

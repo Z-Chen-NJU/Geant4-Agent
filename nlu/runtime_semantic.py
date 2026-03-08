@@ -30,6 +30,7 @@ MATERIAL_ALIASES = {
     "cesium iodide": "G4_CESIUM_IODIDE",
     "caesium iodide": "G4_CESIUM_IODIDE",
     "csi": "G4_CESIUM_IODIDE",
+    "碘化铯": "G4_CESIUM_IODIDE",
     "g4_csi": "G4_CESIUM_IODIDE",
     "g4_cesium_iodide": "G4_CESIUM_IODIDE",
     "g4_cesium-iodide": "G4_CESIUM_IODIDE",
@@ -148,6 +149,14 @@ def _alias_match(text: str, mapping: dict[str, str], allowed: list[str]) -> str 
             if canonical in allowed:
                 return canonical
     return None
+
+
+def _has_unknown_material_marker(text: str) -> bool:
+    low = text.lower()
+    return bool(
+        re.search(r"(?:材料|material)\s*[:：]?\s*[?？]+", text)
+        or re.search(r"(?:材料|material)\s*(?:unknown|tbd|unspecified)\b", low)
+    )
 
 
 def _pick_ner_model() -> str:
@@ -369,15 +378,30 @@ def extract_runtime_semantic_frame(
         frame.geometry.params.update(params)
 
     knowledge = _load_knowledge()
-    material = _match_any(param_text, knowledge["materials"]) or _alias_match(param_text, MATERIAL_ALIASES, knowledge["materials"])
+    raw_material = None if _has_unknown_material_marker(text) else (
+        _match_any(text, knowledge["materials"]) or _alias_match(text, MATERIAL_ALIASES, knowledge["materials"])
+    )
+    normalized_material = None if _has_unknown_material_marker(normalized_text or "") else (
+        _match_any(normalized_text, knowledge["materials"])
+        or _alias_match(normalized_text, MATERIAL_ALIASES, knowledge["materials"])
+    )
+    material = raw_material or normalized_material
     if material:
         frame.materials.selected_materials = [material]
 
-    particle = _match_any(param_text, knowledge["particles"]) or _alias_match(param_text, PARTICLE_ALIASES, knowledge["particles"])
+    particle = _match_any(param_text, knowledge["particles"]) or _alias_match(
+        param_text, PARTICLE_ALIASES, knowledge["particles"]
+    )
     if particle:
         frame.source.particle = particle
 
-    source_type = _match_any(param_text, knowledge["source_types"]) or _alias_match(param_text, SOURCE_TYPE_ALIASES, knowledge["source_types"])
+    raw_source_type = _match_any(text, knowledge["source_types"]) or _alias_match(
+        text, SOURCE_TYPE_ALIASES, knowledge["source_types"]
+    )
+    normalized_source_type = _match_any(normalized_text, knowledge["source_types"]) or _alias_match(
+        normalized_text, SOURCE_TYPE_ALIASES, knowledge["source_types"]
+    )
+    source_type = raw_source_type or normalized_source_type
     if source_type:
         frame.source.type = source_type
 

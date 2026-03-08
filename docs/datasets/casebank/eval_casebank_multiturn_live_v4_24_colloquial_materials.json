@@ -300,7 +300,7 @@
       "lang": "zh",
       "prompt": "我想做一个二维阵列探测板，但 pitch 和材料还没定。",
       "followup_turns": [
-        "设成 4 x 3 的盒体阵列，每个模块 10 mm x 10 mm x 2 mm，pitch_x 12 mm，pitch_y 14 mm，间隙 1 mm，材料 ?；点源 gamma 0.511 MeV，位置 (0,0,-80) mm，方向 +z；物理列表 QBBC；输出 root。"
+        "设成 4 x 3 的盒体阵列，每个模块 10 mm x 10 mm x 2 mm，pitch_x 12 mm，pitch_y 14 mm，间隙 1 mm，材料 硅；点源 gamma 0.511 MeV，位置 (0,0,-80) mm，方向 +z；物理列表 QBBC；输出 root。"
       ],
       "expected_flow": {
         "initial_complete": false,
@@ -392,7 +392,7 @@
       "lang": "zh",
       "prompt": "我想做一个挖空的盒体几何，但先只给你意图。",
       "followup_turns": [
-        "做减法布尔体：A 为 40 mm x 40 mm x 40 mm 盒体，B 为 20 mm x 20 mm x 20 mm 盒体，从 A 中减去 B；材料 ?；点源 gamma 0.3 MeV，位置 (0,0,-60) mm，方向 +z；物理列表 QBBC；输出 xml。"
+        "做减法布尔体：A 为 40 mm x 40 mm x 40 mm 盒体，B 为 20 mm x 20 mm x 20 mm 盒体，从 A 中减去 B；材料 铝；点源 gamma 0.3 MeV，位置 (0,0,-60) mm，方向 +z；物理列表 QBBC；输出 xml。"
       ],
       "expected_flow": {
         "initial_complete": false,
@@ -433,7 +433,7 @@
       "style": "precise",
       "completeness": "full",
       "lang": "zh",
-      "prompt": "请创建完整的阵列配置：3 x 3 盒体阵列，每个模块 12 mm x 12 mm x 3 mm，pitch_x 15 mm，pitch_y 15 mm，间隙 1 mm，材料 ???；点源 gamma 0.662 MeV，位置 (0,0,-90) mm，方向 +z；物理列表 QBBC；输出 root。",
+      "prompt": "请创建完整的阵列配置：3 x 3 盒体阵列，每个模块 12 mm x 12 mm x 3 mm，pitch_x 15 mm，pitch_y 15 mm，间隙 1 mm，材料 碘化铯；点源 gamma 0.662 MeV，位置 (0,0,-90) mm，方向 +z；物理列表 QBBC；输出 root。",
       "followup_turns": [],
       "expected_flow": {
         "initial_complete": true,
@@ -517,7 +517,7 @@
       "style": "precise",
       "completeness": "full",
       "lang": "zh",
-      "prompt": "请创建完整布尔配置：做并集布尔体，A 为 30 mm x 30 mm x 20 mm 盒体，B 为 10 mm x 10 mm x 40 mm 盒体，与 A 做 union；材料 ?；束流 gamma 0.5 MeV，位置 (0,0,-70) mm，方向 +z；物理列表 QBBC；输出 json。",
+      "prompt": "请创建完整布尔配置：做并集布尔体，A 为 30 mm x 30 mm x 20 mm 盒体，B 为 10 mm x 10 mm x 40 mm 盒体，与 A 做 union；材料 铝；束流 gamma 0.5 MeV，位置 (0,0,-70) mm，方向 +z；物理列表 QBBC；输出 json。",
       "followup_turns": [],
       "expected_flow": {
         "initial_complete": true,

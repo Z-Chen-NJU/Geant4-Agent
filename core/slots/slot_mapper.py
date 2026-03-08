@@ -23,6 +23,7 @@ _MATERIAL_CANONICAL_OVERRIDES = {
     "csi": "G4_CESIUM_IODIDE",
     "cesium iodide": "G4_CESIUM_IODIDE",
     "caesium iodide": "G4_CESIUM_IODIDE",
+    "碘化铯": "G4_CESIUM_IODIDE",
 }
 
 

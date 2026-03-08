@@ -43,7 +43,7 @@ def get_minimal_required_paths(config: dict | None = None) -> list[str]:
         "source.position",
     ]
     source_type = str(get_path(config or {}, "source.type", "") or "").lower()
-    if source_type in {"point", "beam", "plane", ""}:
+    if source_type in {"beam", "plane", ""}:
         source_required.append("source.direction")
     return _geometry_required_paths(config) + [
         "materials.volume_material_map",
@@ -67,7 +67,7 @@ def get_local_required_paths(phase: Phase, *, config: dict | None = None) -> lis
             "source.position",
         ]
         source_type = str(get_path(config or {}, "source.type", "") or "").lower()
-        if source_type in {"point", "beam", "plane", ""}:
+        if source_type in {"beam", "plane", ""}:
             required.append("source.direction")
         return required
     if phase == Phase.PHYSICS:

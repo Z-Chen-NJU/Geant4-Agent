@@ -18,10 +18,17 @@ SKELETON_SUMMARY: Dict[str, str] = {
     "single_box": "single_box",
     "single_tubs": "single_tubs",
     "single_sphere": "single_sphere",
+    "single_orb": "single_orb",
     "single_cons": "single_cons",
     "single_trd": "single_trd",
     "single_polycone": "single_polycone",
     "single_cuttubs": "single_cuttubs",
+    "single_trap": "single_trap",
+    "single_para": "single_para",
+    "single_torus": "single_torus",
+    "single_ellipsoid": "single_ellipsoid",
+    "single_elltube": "single_elltube",
+    "single_polyhedra": "single_polyhedra",
     "boolean_union_boxes": "boolean",
     "boolean_subtraction_boxes": "boolean",
     "boolean_intersection_boxes": "boolean",
@@ -29,22 +36,64 @@ SKELETON_SUMMARY: Dict[str, str] = {
 }
 
 KEYWORD_CUES: Dict[str, Tuple[str, ...]] = {
-    "ring": ("ring", "circular", "annulus", "circle", "radius"),
-    "grid": ("grid", "array", "matrix", "pitch", "nx", "ny"),
-    "nest": ("nest", "inside", "contains", "contain", "inner", "outer"),
-    "stack": ("stack", "layer", "layers", "along z"),
-    "shell": ("shell", "concentric", "thickness", "coaxial"),
+    "ring": ("ring", "circular", "annulus", "circle", "radius", "环", "环形", "圆环"),
+    "grid": ("grid", "array", "matrix", "pitch", "nx", "ny", "阵列", "二维阵列", "探测板"),
+    "nest": ("nest", "inside", "contains", "contain", "inner", "outer", "嵌套", "内嵌", "盒子里", "外盒"),
+    "stack": ("stack", "layer", "layers", "along z", "stacked", "sandwich", "堆叠", "层", "夹层"),
+    "shell": ("shell", "concentric", "thickness", "coaxial", "壳", "屏蔽壳", "同心"),
     "single_box": ("single_box", "box", "cube", "cuboid"),
     "single_tubs": ("single_tubs", "tubs", "cylinder", "tube"),
     "single_sphere": ("single_sphere", "sphere", "ball"),
+    "single_orb": ("single_orb", "orb"),
     "single_cons": ("single_cons", "cons", "cone", "frustum"),
     "single_trd": ("single_trd", "trd", "trapezoid", "trapezoidal"),
     "single_polycone": ("single_polycone", "polycone", "z planes"),
     "single_cuttubs": ("single_cuttubs", "cuttubs", "cut tubs"),
-    "boolean": ("boolean", "union", "subtraction", "intersection"),
+    "single_trap": ("single_trap", "trap", "trapezoid prism"),
+    "single_para": ("single_para", "para", "parallelepiped", "skewed box"),
+    "single_torus": ("single_torus", "torus", "donut", "ring tube"),
+    "single_ellipsoid": ("single_ellipsoid", "ellipsoid", "elliptic"),
+    "single_elltube": ("single_elltube", "elliptical tube", "ellipse tube", "elliptic tube"),
+    "single_polyhedra": ("single_polyhedra", "polyhedra", "polyhedron"),
+    "boolean": (
+        "boolean",
+        "union",
+        "subtraction",
+        "intersection",
+        "subtract",
+        "minus",
+        "difference",
+        "hole",
+        "cutout",
+        "cut out",
+        "减去",
+        "差集",
+        "挖空",
+        "开孔",
+    ),
+}
+
+BOOLEAN_OP_CUES: Dict[str, Tuple[str, ...]] = {
+    "boolean_union_boxes": ("union", "combine", "merge", "并", "合并"),
+    "boolean_subtraction_boxes": (
+        "subtraction",
+        "subtract",
+        "minus",
+        "difference",
+        "hole",
+        "cutout",
+        "cut out",
+        "减去",
+        "差集",
+        "挖空",
+        "开孔",
+        "打孔",
+    ),
+    "boolean_intersection_boxes": ("intersection", "intersect", "overlap", "交", "相交"),
 }
 
 AMBIGUITY_CUES = ("ambiguous", "undecided", "unresolved", "not fixed")
+GRAPH_SUMMARIES = {"ring", "grid", "nest", "stack", "shell", "boolean"}
 
 
 @dataclass(frozen=True)
@@ -88,6 +137,10 @@ def _cue_score(text: str, structure: str) -> float:
             if needle in t:
                 score += 0.32
             continue
+        if any(ord(ch) > 127 for ch in needle):
+            if needle in t:
+                score += 0.32
+            continue
         if re.search(rf"(?<![a-z0-9_]){re.escape(needle)}(?![a-z0-9_])", t):
             score += 0.32
     return score
@@ -95,7 +148,7 @@ def _cue_score(text: str, structure: str) -> float:
 
 def _explicit_structure_hint(text: str) -> str:
     m = re.search(
-        r"(?:^|[;\s])structure\s*[:=]\s*(ring|grid|nest|stack|shell|single_box|single_tubs|single_sphere|single_cons|single_trd|single_polycone|single_cuttubs|boolean)\b",
+        r"(?:^|[;\s])structure\s*[:=]\s*(ring|grid|nest|stack|shell|single_box|single_tubs|single_sphere|single_orb|single_cons|single_trd|single_polycone|single_cuttubs|single_trap|single_para|single_torus|single_ellipsoid|single_elltube|single_polyhedra|boolean)\b",
         text,
         flags=re.IGNORECASE,
     )
@@ -133,6 +186,8 @@ def _score_candidate(
     params: Dict[str, float],
     candidate: CandidateGraph,
     explicit_hint: str,
+    prior_summary: str = "",
+    prior_confidence: float = 0.0,
 ) -> Tuple[float, Dict[str, float]]:
     coverage = _coverage_score(params, candidate.structure)
     cue = _cue_score(text, candidate.summary)
@@ -142,8 +197,29 @@ def _score_candidate(
     hint_term = 0.0
     if explicit_hint:
         hint_term = 1.15 if candidate.summary == explicit_hint else -0.18
+    prior_term = 0.0
+    if prior_summary and prior_summary != "unknown" and prior_confidence > 0.0:
+        capped_conf = min(max(float(prior_confidence), 0.0), 1.0)
+        if candidate.summary == prior_summary:
+            prior_term = (1.05 if prior_summary in GRAPH_SUMMARIES else 0.55) * capped_conf
+        elif prior_summary in GRAPH_SUMMARIES and candidate.summary.startswith("single_"):
+            prior_term = -0.15 * capped_conf
 
-    total = 2.1 * coverage + cue + feasible_term + missing_term + error_term + hint_term
+    boolean_op_term = 0.0
+    if candidate.structure in BOOLEAN_OP_CUES:
+        boolean_low = text.lower()
+        matched = any(cue in boolean_low for cue in BOOLEAN_OP_CUES[candidate.structure])
+        any_boolean_op = any(
+            cue in boolean_low
+            for cues in BOOLEAN_OP_CUES.values()
+            for cue in cues
+        )
+        if matched:
+            boolean_op_term = 0.65
+        elif any_boolean_op:
+            boolean_op_term = -0.10
+
+    total = 2.1 * coverage + cue + feasible_term + missing_term + error_term + hint_term + prior_term + boolean_op_term
     return total, {
         "coverage": 2.1 * coverage,
         "cue": cue,
@@ -151,6 +227,8 @@ def _score_candidate(
         "missing": missing_term,
         "errors": error_term,
         "hint": hint_term,
+        "structure_prior": prior_term,
+        "boolean_op": boolean_op_term,
         "total": total,
     }
 
@@ -163,6 +241,8 @@ def search_candidate_graphs(
     seed: int = 7,
     top_k: int = 3,
     apply_autofix: bool = False,
+    prior_summary: str = "",
+    prior_confidence: float = 0.0,
 ) -> GraphSearchResult:
     notes: List[str] = []
     explicit_hint = _explicit_structure_hint(text)
@@ -179,10 +259,17 @@ def search_candidate_graphs(
         "single_box",
         "single_tubs",
         "single_sphere",
+        "single_orb",
         "single_cons",
         "single_trd",
         "single_polycone",
         "single_cuttubs",
+        "single_trap",
+        "single_para",
+        "single_torus",
+        "single_ellipsoid",
+        "single_elltube",
+        "single_polyhedra",
         "boolean_union_boxes",
         "boolean_subtraction_boxes",
         "boolean_intersection_boxes",
@@ -201,7 +288,14 @@ def search_candidate_graphs(
         ):
             continue
         c = _build_candidate(structure, params, seed=seed, apply_autofix=apply_autofix)
-        score, breakdown = _score_candidate(text, params, c, explicit_hint)
+        score, breakdown = _score_candidate(
+            text,
+            params,
+            c,
+            explicit_hint,
+            prior_summary=prior_summary,
+            prior_confidence=prior_confidence,
+        )
         c2 = CandidateGraph(
             structure=c.structure,
             summary=c.summary,

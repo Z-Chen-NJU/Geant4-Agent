@@ -17,9 +17,14 @@ from transformers import (
     TrainingArguments,
 )
 
+from nlu.bert_lab.labels import STRUCTURE_LABELS as DEFAULT_STRUCTURE_LABELS
 
-LABELS = ["nest", "grid", "ring", "stack", "shell", "unknown"]
-LABEL_TO_ID = {name: i for i, name in enumerate(LABELS)}
+
+@dataclass
+class RawSample:
+    text: str
+    label_name: str
+    source: str
 
 
 @dataclass
@@ -76,8 +81,8 @@ def _resolve_data_path(user_path: str | None) -> str:
     raise FileNotFoundError("No structure dataset found. Pass --data explicitly.")
 
 
-def _load_samples(path: str) -> list[Sample]:
-    samples: list[Sample] = []
+def _load_raw_samples(path: str) -> list[RawSample]:
+    samples: list[RawSample] = []
     with Path(path).open("r", encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
@@ -87,10 +92,29 @@ def _load_samples(path: str) -> list[Sample]:
             text = str(obj.get("text", "")).strip()
             structure = str(obj.get("structure", "")).strip()
             source = str(obj.get("source", "unknown"))
-            if not text or structure not in LABEL_TO_ID:
+            if not text or not structure:
                 continue
-            samples.append(Sample(text=text, label=LABEL_TO_ID[structure], source=source))
+            samples.append(RawSample(text=text, label_name=structure, source=source))
     return samples
+
+
+def _build_label_vocab(samples: list[RawSample]) -> tuple[list[str], dict[str, int]]:
+    present = {sample.label_name for sample in samples if sample.label_name}
+    ordered = [label for label in DEFAULT_STRUCTURE_LABELS if label in present]
+    extras = sorted(present - set(ordered))
+    labels = ordered + extras
+    label_to_id = {name: i for i, name in enumerate(labels)}
+    return labels, label_to_id
+
+
+def _encode_samples(raw_samples: list[RawSample], label_to_id: dict[str, int]) -> list[Sample]:
+    encoded: list[Sample] = []
+    for sample in raw_samples:
+        label_id = label_to_id.get(sample.label_name)
+        if label_id is None:
+            continue
+        encoded.append(Sample(text=sample.text, label=label_id, source=sample.source))
+    return encoded
 
 
 def _split_samples(samples: list[Sample], eval_split: float, seed: int) -> tuple[list[Sample], list[Sample]]:
@@ -142,11 +166,11 @@ def _compute_class_weights(train_samples: list[Sample], unknown_boost: float) ->
     return weights
 
 
-def compute_metrics(eval_pred):
+def compute_metrics(eval_pred, *, n_labels: int):
     logits, labels = eval_pred
     preds = logits.argmax(axis=-1)
     acc = float((preds == labels).mean().item())
-    macro_f1 = _macro_f1(preds, labels, len(LABELS))
+    macro_f1 = _macro_f1(preds, labels, n_labels)
     return {"accuracy": acc, "macro_f1": macro_f1}
 
 
@@ -200,17 +224,19 @@ def main() -> None:
     metric_for_best = str(_cfg(cfg, "metric_for_best_model", "macro_f1"))
     greater_is_better = bool(_cfg(cfg, "greater_is_better", True))
 
-    samples = _load_samples(data_path)
-    if not samples:
+    raw_samples = _load_raw_samples(data_path)
+    if not raw_samples:
         raise ValueError("Dataset is empty or contains no supported labels.")
+    labels, label_to_id = _build_label_vocab(raw_samples)
+    samples = _encode_samples(raw_samples, label_to_id)
     train_samples, eval_samples = _split_samples(samples, eval_split, seed)
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
-        num_labels=len(LABELS),
-        id2label={i: name for i, name in enumerate(LABELS)},
-        label2id=LABEL_TO_ID,
+        num_labels=len(labels),
+        id2label={i: name for i, name in enumerate(labels)},
+        label2id=label_to_id,
     )
 
     if args.device == "cuda" and not torch.cuda.is_available():
@@ -257,7 +283,9 @@ def main() -> None:
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
-        compute_metrics=compute_metrics if eval_dataset is not None else None,
+        compute_metrics=(lambda eval_pred: compute_metrics(eval_pred, n_labels=len(labels)))
+        if eval_dataset is not None
+        else None,
         callbacks=callbacks,
     )
 
@@ -270,6 +298,10 @@ def main() -> None:
         metrics = trainer.evaluate()
 
     (outdir / "eval_metrics.json").write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
+    (outdir / "label_map.json").write_text(
+        json.dumps({"labels": labels, "label_to_id": label_to_id}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
     (outdir / "training_profile.json").write_text(
         json.dumps(
             {
@@ -293,13 +325,14 @@ def main() -> None:
                 },
                 "n_train": len(train_samples),
                 "n_eval": len(eval_samples),
+                "labels": labels,
                 "label_distribution_train": {
                     name: sum(1 for x in train_samples if x.label == idx)
-                    for name, idx in LABEL_TO_ID.items()
+                    for name, idx in label_to_id.items()
                 },
                 "label_distribution_eval": {
                     name: sum(1 for x in eval_samples if x.label == idx)
-                    for name, idx in LABEL_TO_ID.items()
+                    for name, idx in label_to_id.items()
                 },
             },
             ensure_ascii=False,

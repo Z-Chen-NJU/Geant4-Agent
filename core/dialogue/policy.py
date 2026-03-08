@@ -29,10 +29,12 @@ def decide_dialogue_action(
     updated_paths: list[str],
     answered_this_turn: list[str],
     pending_overwrite_preview: list[dict] | None = None,
+    rejected_overwrite_preview: list[dict] | None = None,
     available_explanations: dict | None = None,
     last_dialogue_action: str = "",
 ) -> DialogueDecision:
     pending_overwrite_preview = list(pending_overwrite_preview or [])
+    rejected_overwrite_preview = list(rejected_overwrite_preview or [])
     available_explanations = dict(available_explanations or {})
     if pending_overwrite_preview:
         return DialogueDecision(
@@ -40,6 +42,14 @@ def decide_dialogue_action(
             missing_fields=list(missing_fields),
             answered_this_turn=list(answered_this_turn),
             overwrite_preview=pending_overwrite_preview,
+            user_intent=user_intent,
+        )
+    if rejected_overwrite_preview:
+        return DialogueDecision(
+            action=DialogueAction.REJECT_OVERWRITE,
+            missing_fields=list(missing_fields),
+            answered_this_turn=list(answered_this_turn),
+            overwrite_preview=rejected_overwrite_preview,
             user_intent=user_intent,
         )
     explainable_sources = {

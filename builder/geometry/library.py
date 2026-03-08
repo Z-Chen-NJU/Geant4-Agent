@@ -9,14 +9,21 @@ from .dsl import (
     Box,
     Cons,
     CutTubs,
+    EllipticalTube,
+    Ellipsoid,
     Graph,
     GridXY,
     Nest,
+    Para,
     Polycone,
+    Polyhedra,
     Ring,
     ShellTubsFromThicknesses,
+    Orb,
     Sphere,
     StackZ,
+    Torus,
+    Trap,
     Transform,
     Trd,
     Tubs,
@@ -212,6 +219,15 @@ def sample_single_sphere(rng: random.Random) -> Dict[str, float]:
     return {"child_rmax": _sample_uniform(rng, 2.0, 120.0)}
 
 
+def build_single_orb(p: Dict[str, float]) -> Graph:
+    nodes = {"orb": Orb(id="orb", rmax=p["child_rmax"])}
+    return Graph(nodes=nodes, root="orb")
+
+
+def sample_single_orb(rng: random.Random) -> Dict[str, float]:
+    return {"child_rmax": _sample_uniform(rng, 2.0, 120.0)}
+
+
 def build_single_cons(p: Dict[str, float]) -> Graph:
     nodes = {"cons": Cons(id="cons", rmax1=p["rmax1"], rmax2=p["rmax2"], hz=p["child_hz"])}
     return Graph(nodes=nodes, root="cons")
@@ -291,6 +307,143 @@ def sample_single_cuttubs(rng: random.Random) -> Dict[str, float]:
         "child_hz": _sample_uniform(rng, 2.0, 120.0),
         "tilt_x": _sample_uniform(rng, 0.0, 15.0),
         "tilt_y": _sample_uniform(rng, 0.0, 15.0),
+    }
+
+
+def build_single_trap(p: Dict[str, float]) -> Graph:
+    nodes = {
+        "trap": Trap(
+            id="trap",
+            x1=p["trap_x1"],
+            x2=p["trap_x2"],
+            x3=p["trap_x3"],
+            x4=p["trap_x4"],
+            y1=p["trap_y1"],
+            y2=p["trap_y2"],
+            z=p["trap_z"],
+        )
+    }
+    return Graph(nodes=nodes, root="trap")
+
+
+def sample_single_trap(rng: random.Random) -> Dict[str, float]:
+    return {
+        "trap_x1": _sample_uniform(rng, 2.0, 80.0),
+        "trap_x2": _sample_uniform(rng, 2.0, 80.0),
+        "trap_x3": _sample_uniform(rng, 2.0, 80.0),
+        "trap_x4": _sample_uniform(rng, 2.0, 80.0),
+        "trap_y1": _sample_uniform(rng, 2.0, 80.0),
+        "trap_y2": _sample_uniform(rng, 2.0, 80.0),
+        "trap_z": _sample_uniform(rng, 2.0, 120.0),
+    }
+
+
+def build_single_para(p: Dict[str, float]) -> Graph:
+    nodes = {
+        "para": Para(
+            id="para",
+            x=p["para_x"],
+            y=p["para_y"],
+            z=p["para_z"],
+            alpha=p["para_alpha"],
+            theta=p["para_theta"],
+            phi=p["para_phi"],
+        )
+    }
+    return Graph(nodes=nodes, root="para")
+
+
+def sample_single_para(rng: random.Random) -> Dict[str, float]:
+    return {
+        "para_x": _sample_uniform(rng, 2.0, 100.0),
+        "para_y": _sample_uniform(rng, 2.0, 100.0),
+        "para_z": _sample_uniform(rng, 2.0, 120.0),
+        "para_alpha": _sample_uniform(rng, 0.0, 20.0),
+        "para_theta": _sample_uniform(rng, 0.0, 20.0),
+        "para_phi": _sample_uniform(rng, 0.0, 20.0),
+    }
+
+
+def build_single_torus(p: Dict[str, float]) -> Graph:
+    nodes = {"torus": Torus(id="torus", rtor=p["torus_rtor"], rmax=p["torus_rmax"])}
+    return Graph(nodes=nodes, root="torus")
+
+
+def sample_single_torus(rng: random.Random) -> Dict[str, float]:
+    major = _sample_uniform(rng, 10.0, 120.0)
+    minor = _sample_uniform(rng, 2.0, max(3.0, major * 0.4))
+    return {
+        "torus_rtor": major,
+        "torus_rmax": minor,
+    }
+
+
+def build_single_ellipsoid(p: Dict[str, float]) -> Graph:
+    nodes = {
+        "ellipsoid": Ellipsoid(
+            id="ellipsoid",
+            ax=p["ellipsoid_ax"],
+            by=p["ellipsoid_by"],
+            cz=p["ellipsoid_cz"],
+        )
+    }
+    return Graph(nodes=nodes, root="ellipsoid")
+
+
+def build_single_elltube(p: Dict[str, float]) -> Graph:
+    nodes = {
+        "elltube": EllipticalTube(
+            id="elltube",
+            ax=p["elltube_ax"],
+            by=p["elltube_by"],
+            hz=p["elltube_hz"],
+        )
+    }
+    return Graph(nodes=nodes, root="elltube")
+
+
+def sample_single_elltube(rng: random.Random) -> Dict[str, float]:
+    return {
+        "elltube_ax": _sample_uniform(rng, 2.0, 80.0),
+        "elltube_by": _sample_uniform(rng, 2.0, 80.0),
+        "elltube_hz": _sample_uniform(rng, 2.0, 120.0),
+    }
+
+
+def build_single_polyhedra(p: Dict[str, float]) -> Graph:
+    z_planes = tuple(sorted((p["z1"], p["z2"], p["z3"])))
+    nodes = {
+        "polyhedra": Polyhedra(
+            id="polyhedra",
+            nsides=int(p["polyhedra_nsides"]),
+            z_planes=z_planes,
+            rmax=(p["r1"], p["r2"], p["r3"]),
+        )
+    }
+    return Graph(nodes=nodes, root="polyhedra")
+
+
+def sample_single_polyhedra(rng: random.Random) -> Dict[str, float]:
+    z1 = _sample_uniform(rng, -80.0, -10.0)
+    z2 = _sample_uniform(rng, -5.0, 5.0)
+    z3 = _sample_uniform(rng, 10.0, 80.0)
+    z1, z2, z3 = sorted((z1, z2, z3))
+    return {
+        "polyhedra_nsides": float(_sample_int(rng, 3, 12)),
+        "z1": z1,
+        "z2": z2,
+        "z3": z3,
+        "r1": _sample_uniform(rng, 2.0, 40.0),
+        "r2": _sample_uniform(rng, 2.0, 40.0),
+        "r3": _sample_uniform(rng, 2.0, 40.0),
+    }
+
+
+def sample_single_ellipsoid(rng: random.Random) -> Dict[str, float]:
+    return {
+        "ellipsoid_ax": _sample_uniform(rng, 2.0, 100.0),
+        "ellipsoid_by": _sample_uniform(rng, 2.0, 100.0),
+        "ellipsoid_cz": _sample_uniform(rng, 2.0, 120.0),
     }
 
 
@@ -424,7 +577,7 @@ register_skeleton(
         name="shell_nested",
         build_fn=build_shell_nested,
         param_sampler=sample_shell_nested,
-        param_keys=("inner_r", "th1", "th2", "th3", "hz", "child_rmax", "child_hz", "clearance"),
+        param_keys=("inner_r", "th1", "th2", "hz", "child_rmax", "child_hz", "clearance"),
     )
 )
 register_skeleton(
@@ -448,6 +601,14 @@ register_skeleton(
         name="single_sphere",
         build_fn=build_single_sphere,
         param_sampler=sample_single_sphere,
+        param_keys=("child_rmax",),
+    )
+)
+register_skeleton(
+    Skeleton(
+        name="single_orb",
+        build_fn=build_single_orb,
+        param_sampler=sample_single_orb,
         param_keys=("child_rmax",),
     )
 )
@@ -503,6 +664,54 @@ register_skeleton(
         build_fn=build_single_cuttubs,
         param_sampler=sample_single_cuttubs,
         param_keys=("child_rmax", "child_hz", "tilt_x", "tilt_y"),
+    )
+)
+register_skeleton(
+    Skeleton(
+        name="single_trap",
+        build_fn=build_single_trap,
+        param_sampler=sample_single_trap,
+        param_keys=("trap_x1", "trap_x2", "trap_x3", "trap_x4", "trap_y1", "trap_y2", "trap_z"),
+    )
+)
+register_skeleton(
+    Skeleton(
+        name="single_para",
+        build_fn=build_single_para,
+        param_sampler=sample_single_para,
+        param_keys=("para_x", "para_y", "para_z", "para_alpha", "para_theta", "para_phi"),
+    )
+)
+register_skeleton(
+    Skeleton(
+        name="single_torus",
+        build_fn=build_single_torus,
+        param_sampler=sample_single_torus,
+        param_keys=("torus_rtor", "torus_rmax"),
+    )
+)
+register_skeleton(
+    Skeleton(
+        name="single_ellipsoid",
+        build_fn=build_single_ellipsoid,
+        param_sampler=sample_single_ellipsoid,
+        param_keys=("ellipsoid_ax", "ellipsoid_by", "ellipsoid_cz"),
+    )
+)
+register_skeleton(
+    Skeleton(
+        name="single_elltube",
+        build_fn=build_single_elltube,
+        param_sampler=sample_single_elltube,
+        param_keys=("elltube_ax", "elltube_by", "elltube_hz"),
+    )
+)
+register_skeleton(
+    Skeleton(
+        name="single_polyhedra",
+        build_fn=build_single_polyhedra,
+        param_sampler=sample_single_polyhedra,
+        param_keys=("polyhedra_nsides", "z1", "z2", "z3", "r1", "r2", "r3"),
     )
 )
 register_skeleton(
@@ -577,6 +786,28 @@ PARAM_SIGNATURE_KEYS: Tuple[str, ...] = (
     "r1",
     "r2",
     "r3",
+    "trap_x1",
+    "trap_x2",
+    "trap_x3",
+    "trap_x4",
+    "trap_y1",
+    "trap_y2",
+    "trap_z",
+    "para_x",
+    "para_y",
+    "para_z",
+    "para_alpha",
+    "para_theta",
+    "para_phi",
+    "torus_rtor",
+    "torus_rmax",
+    "ellipsoid_ax",
+    "ellipsoid_by",
+    "ellipsoid_cz",
+    "elltube_ax",
+    "elltube_by",
+    "elltube_hz",
+    "polyhedra_nsides",
     "tilt_x",
     "tilt_y",
     "bool_a_x",
@@ -636,6 +867,15 @@ def sample_param_signature(rng: random.Random) -> Dict[str, float]:
         "r1": _sample_uniform(rng, 2.0, 40.0),
         "r2": _sample_uniform(rng, 2.0, 40.0),
         "r3": _sample_uniform(rng, 2.0, 40.0),
+        "torus_rtor": _sample_uniform(rng, 10.0, 120.0),
+        "torus_rmax": _sample_uniform(rng, 2.0, 20.0),
+        "ellipsoid_ax": _sample_uniform(rng, 2.0, 100.0),
+        "ellipsoid_by": _sample_uniform(rng, 2.0, 100.0),
+        "ellipsoid_cz": _sample_uniform(rng, 2.0, 120.0),
+        "elltube_ax": _sample_uniform(rng, 2.0, 80.0),
+        "elltube_by": _sample_uniform(rng, 2.0, 80.0),
+        "elltube_hz": _sample_uniform(rng, 2.0, 120.0),
+        "polyhedra_nsides": float(_sample_int(rng, 3, 12)),
         "tilt_x": _sample_uniform(rng, 0.0, 15.0),
         "tilt_y": _sample_uniform(rng, 0.0, 15.0),
         "bool_a_x": _sample_uniform(rng, 5.0, 60.0),

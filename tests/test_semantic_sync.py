@@ -37,6 +37,26 @@ class SemanticSyncTest(unittest.TestCase):
         self.assertEqual(mapped["output.path"], "output/result.root")
         self.assertEqual(mapped["source.type"], "point")
 
+    def test_sync_geometry_overrides_single_solid_when_graph_root_is_boolean(self) -> None:
+        config = {
+            "geometry": {
+                "structure": "single_box",
+                "graph_program": {"root": "boolean", "nodes": [], "constraints": []},
+                "chosen_skeleton": "boolean_union_boxes",
+                "root_name": "box",
+            },
+            "materials": {},
+            "source": {},
+            "physics": {},
+            "output": {},
+        }
+        candidate = build_semantic_sync_candidate(config, turn_id=10)
+        self.assertIsNotNone(candidate)
+        assert candidate is not None
+        mapped = {u.path: u.value for u in candidate.updates}
+        self.assertEqual(mapped["geometry.structure"], "boolean")
+        self.assertEqual(mapped["geometry.root_name"], "boolean")
+
 
 if __name__ == "__main__":
     unittest.main()

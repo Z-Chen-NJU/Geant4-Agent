@@ -6,13 +6,46 @@ from core.orchestrator.path_ops import get_path
 from core.orchestrator.types import CandidateUpdate, Intent, Producer, UpdateOp
 
 
-def _infer_root_name(structure: str | None) -> str:
+def _infer_root_name(structure: str | None, graph_program: dict | None = None) -> str:
+    graph_root = ""
+    if isinstance(graph_program, dict):
+        graph_root = str(graph_program.get("root", "") or "").strip()
+    if graph_root:
+        return graph_root
     return {
         "single_box": "box",
         "single_tubs": "tubs",
         "single_sphere": "sphere",
+        "single_orb": "orb",
+        "single_cons": "cons",
+        "single_trd": "trd",
+        "single_polycone": "polycone",
+        "single_cuttubs": "cuttubs",
+        "single_trap": "trap",
+        "single_para": "para",
+        "single_torus": "torus",
+        "single_ellipsoid": "ellipsoid",
+        "single_elltube": "elltube",
+        "single_polyhedra": "polyhedra",
         "boolean": "boolean",
     }.get(str(structure or ""), "target")
+
+
+def _infer_structure_from_graph(graph_program: dict | None, chosen_skeleton: str | None = None) -> str:
+    if isinstance(graph_program, dict):
+        root = str(graph_program.get("root", "") or "").strip().lower()
+        if root in {"ring", "grid", "nest", "stack", "shell", "boolean"}:
+            return root
+    return {
+        "ring_modules": "ring",
+        "grid_modules": "grid",
+        "stack_in_box": "stack",
+        "shell_nested": "shell",
+        "nest_box_tubs": "nest",
+        "boolean_union_boxes": "boolean",
+        "boolean_subtraction_boxes": "boolean",
+        "boolean_intersection_boxes": "boolean",
+    }.get(str(chosen_skeleton or ""), "")
 
 
 def _latest_update_for_prefix(recent_updates: list[UpdateOp] | None, prefix: str) -> UpdateOp | None:
@@ -53,19 +86,33 @@ def _sync_output(config: dict) -> dict[str, object]:
 
 def _sync_geometry(config: dict) -> dict[str, object]:
     structure = get_path(config, "geometry.structure")
-    if not structure:
+    graph_program = get_path(config, "geometry.graph_program")
+    chosen_skeleton = get_path(config, "geometry.chosen_skeleton")
+    updates: dict[str, object] = {}
+    inferred = _infer_structure_from_graph(graph_program if isinstance(graph_program, dict) else None, chosen_skeleton)
+    if inferred and inferred != structure:
+        structure = inferred
+        updates["geometry.structure"] = inferred
+    elif not structure:
         return {}
-    root_name = _infer_root_name(structure)
-    if get_path(config, "geometry.root_name") == root_name:
-        return {}
-    return {"geometry.root_name": root_name}
+    root_name = _infer_root_name(structure, graph_program if isinstance(graph_program, dict) else None)
+    if get_path(config, "geometry.root_name") != root_name:
+        updates["geometry.root_name"] = root_name
+    return updates
 
 
 def _sync_materials(config: dict, recent_updates: list[UpdateOp] | None) -> dict[str, object]:
     updates: dict[str, object] = {}
     structure = get_path(config, "geometry.structure")
     mats = get_path(config, "materials.selected_materials", [])
-    root_name = get_path(config, "geometry.root_name") or _infer_root_name(structure)
+    # Keep volume-material binding anchored to structure-derived root so that
+    # structure overwrite + semantic sync are internally consistent in one turn.
+    graph_program = get_path(config, "geometry.graph_program")
+    root_name = (
+        _infer_root_name(structure, graph_program if isinstance(graph_program, dict) else None)
+        if structure
+        else (get_path(config, "geometry.root_name") or "target")
+    )
 
     if structure and isinstance(mats, list) and len(mats) == 1 and mats[0]:
         expected_map = {root_name: mats[0]}
@@ -174,6 +221,7 @@ def build_semantic_sync_candidate(
             "source.selection_source",
             "source.selection_reasons",
             "output.path",
+            "geometry.structure",
             "geometry.root_name",
             "materials.volume_material_map",
             "materials.selection_source",

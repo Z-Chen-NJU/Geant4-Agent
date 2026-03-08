@@ -1,0 +1,1082 @@
+{
+  "schema_version": "v1",
+  "dataset_name": "casebank_v2_50_diverse_generalization",
+  "description": "50-brand-new diverse cases for anti-overfitting evaluation across domains and dialogue completeness modes.",
+  "cases": [
+    {
+      "id": "V2C01",
+      "domain": "medical_radiotherapy",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Cu",
+        "source.type": "point",
+        "source.particle": "gamma",
+        "output.format": "root"
+      },
+      "prompt": "????? 80 mm x 90 mm x 30 mm??? G4_Cu?source.type=point?particle=gamma?energy=0.50 MeV?position=(0,0,-80) mm?direction=(0,0,1)?physics=QBBC?output=root?",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C02",
+      "domain": "medical_imaging",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_Al",
+        "source.type": "beam",
+        "source.particle": "e-",
+        "output.format": "json"
+      },
+      "prompt": "I need a practical medical_radiotherapy-style setup: target as cylinder radius 33 mm half-length 52 mm made of G4_Al, with a beam e- source at 1.25 MeV from (0,0,-110) mm heading (0,0,1), physics list FTFP_BERT, and json output.",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C03",
+      "domain": "aerospace_see",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_Si",
+        "source.type": "isotropic",
+        "source.particle": "proton",
+        "output.format": "csv"
+      },
+      "prompt": "???? ?? 53 mm??? G4_Si?source.type=isotropic?particle=proton?energy=2.00 MeV?position=(0,0,-140) mm?direction=(0,0,1)?physics=QGSP_BERT_HP?output=csv?",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C04",
+      "domain": "aerospace_shielding",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_WATER",
+        "source.type": "point",
+        "source.particle": "neutron",
+        "output.format": "hdf5"
+      },
+      "prompt": "I need a practical medical_radiotherapy-style setup: target as box 140 mm x 135 mm x 60 mm made of G4_WATER, with a point neutron source at 2.75 MeV from (0,0,-170) mm heading (0,0,1), physics list Shielding, and hdf5 output.",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C05",
+      "domain": "semiconductor_reliability",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_AIR",
+        "source.type": "beam",
+        "source.particle": "gamma",
+        "output.format": "xml"
+      },
+      "prompt": "????? ?? 57 mm ?? 88 mm??? G4_AIR?source.type=beam?particle=gamma?energy=3.50 MeV?position=(0,0,-200) mm?direction=(0,0,1)?physics=QBBC?output=xml?",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C06",
+      "domain": "industrial_ndt",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_Fe",
+        "source.type": "isotropic",
+        "source.particle": "e-",
+        "output.format": "root"
+      },
+      "prompt": "I need a practical medical_radiotherapy-style setup: target as sphere radius 80 mm made of G4_Fe, with a isotropic e- source at 4.25 MeV from (0,0,-230) mm heading (0,0,1), physics list FTFP_BERT, and root output.",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C07",
+      "domain": "security_screening",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Pb",
+        "source.type": "point",
+        "source.particle": "proton",
+        "output.format": "json"
+      },
+      "prompt": "????? 200 mm x 180 mm x 30 mm??? G4_Pb?source.type=point?particle=proton?energy=5.00 MeV?position=(0,0,-80) mm?direction=(0,0,1)?physics=QGSP_BERT_HP?output=json?",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C08",
+      "domain": "nuclear_engineering",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_W",
+        "source.type": "beam",
+        "source.particle": "neutron",
+        "output.format": "csv"
+      },
+      "prompt": "I need a practical medical_radiotherapy-style setup: target as cylinder radius 81 mm half-length 40 mm made of G4_W, with a beam neutron source at 5.75 MeV from (0,0,-110) mm heading (0,0,1), physics list Shielding, and csv output.",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C09",
+      "domain": "environmental_radiation",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_Cu",
+        "source.type": "isotropic",
+        "source.particle": "gamma",
+        "output.format": "hdf5"
+      },
+      "prompt": "???? ?? 107 mm??? G4_Cu?source.type=isotropic?particle=gamma?energy=6.50 MeV?position=(0,0,-140) mm?direction=(0,0,1)?physics=QBBC?output=hdf5?",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C10",
+      "domain": "high_energy_physics",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Al",
+        "source.type": "point",
+        "source.particle": "e-",
+        "output.format": "xml"
+      },
+      "prompt": "I need a practical medical_radiotherapy-style setup: target as box 100 mm x 120 mm x 60 mm made of G4_Al, with a point e- source at 7.25 MeV from (0,0,-170) mm heading (0,0,1), physics list FTFP_BERT, and xml output.",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C11",
+      "domain": "education_demo",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_Si",
+        "source.type": "beam",
+        "source.particle": "proton",
+        "output.format": "root"
+      },
+      "prompt": "????? ?? 41 mm ?? 76 mm??? G4_Si?source.type=beam?particle=proton?energy=0.50 MeV?position=(0,0,-200) mm?direction=(0,0,1)?physics=QGSP_BERT_HP?output=root?",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C12",
+      "domain": "oil_logging",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_WATER",
+        "source.type": "isotropic",
+        "source.particle": "neutron",
+        "output.format": "json"
+      },
+      "prompt": "I need a practical medical_radiotherapy-style setup: target as sphere radius 53 mm made of G4_WATER, with a isotropic neutron source at 1.25 MeV from (0,0,-230) mm heading (0,0,1), physics list Shielding, and json output.",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C13",
+      "domain": "marine_radiation",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_AIR",
+        "source.type": "point",
+        "source.particle": "gamma",
+        "output.format": "csv"
+      },
+      "prompt": "????? 160 mm x 165 mm x 30 mm??? G4_AIR?source.type=point?particle=gamma?energy=2.00 MeV?position=(0,0,-80) mm?direction=(0,0,1)?physics=QBBC?output=csv?",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C14",
+      "domain": "agriculture_irradiation",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_Fe",
+        "source.type": "beam",
+        "source.particle": "e-",
+        "output.format": "hdf5"
+      },
+      "prompt": "I need a practical medical_radiotherapy-style setup: target as cylinder radius 65 mm half-length 112 mm made of G4_Fe, with a beam e- source at 2.75 MeV from (0,0,-110) mm heading (0,0,1), physics list FTFP_BERT, and hdf5 output.",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C15",
+      "domain": "food_sterilization",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_Pb",
+        "source.type": "isotropic",
+        "source.particle": "proton",
+        "output.format": "xml"
+      },
+      "prompt": "???? ?? 80 mm??? G4_Pb?source.type=isotropic?particle=proton?energy=3.50 MeV?position=(0,0,-140) mm?direction=(0,0,1)?physics=QGSP_BERT_HP?output=xml?",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C16",
+      "domain": "archaeology_scan",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_W",
+        "source.type": "point",
+        "source.particle": "neutron",
+        "output.format": "root"
+      },
+      "prompt": "I need a practical medical_radiotherapy-style setup: target as box 220 mm x 105 mm x 60 mm made of G4_W, with a point neutron source at 4.25 MeV from (0,0,-170) mm heading (0,0,1), physics list Shielding, and root output.",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C17",
+      "domain": "geology_assay",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_Cu",
+        "source.type": "beam",
+        "source.particle": "gamma",
+        "output.format": "json"
+      },
+      "prompt": "????? ?? 25 mm ?? 64 mm??? G4_Cu?source.type=beam?particle=gamma?energy=5.00 MeV?position=(0,0,-200) mm?direction=(0,0,1)?physics=QBBC?output=json?",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C18",
+      "domain": "battery_research",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_Al",
+        "source.type": "isotropic",
+        "source.particle": "e-",
+        "output.format": "csv"
+      },
+      "prompt": "I need a practical medical_radiotherapy-style setup: target as sphere radius 107 mm made of G4_Al, with a isotropic e- source at 5.75 MeV from (0,0,-230) mm heading (0,0,1), physics list FTFP_BERT, and csv output.",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C19",
+      "domain": "automotive_electronics",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Si",
+        "source.type": "point",
+        "source.particle": "proton",
+        "output.format": "hdf5"
+      },
+      "prompt": "????? 120 mm x 150 mm x 30 mm??? G4_Si?source.type=point?particle=proton?energy=6.50 MeV?position=(0,0,-80) mm?direction=(0,0,1)?physics=QGSP_BERT_HP?output=hdf5?",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C20",
+      "domain": "fusion_diagnostics",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_WATER",
+        "source.type": "beam",
+        "source.particle": "neutron",
+        "output.format": "xml"
+      },
+      "prompt": "I need a practical medical_radiotherapy-style setup: target as cylinder radius 49 mm half-length 100 mm made of G4_WATER, with a beam neutron source at 7.25 MeV from (0,0,-110) mm heading (0,0,1), physics list Shielding, and xml output.",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C21",
+      "domain": "space_weather",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_AIR",
+        "source.type": "isotropic",
+        "source.particle": "gamma",
+        "output.format": "root"
+      },
+      "prompt": "???? ?? 53 mm??? G4_AIR?source.type=isotropic?particle=gamma?energy=0.50 MeV?position=(0,0,-140) mm?direction=(0,0,1)?physics=QBBC?output=root?",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C22",
+      "domain": "dosimetry_lab",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Fe",
+        "source.type": "point",
+        "source.particle": "e-",
+        "output.format": "json"
+      },
+      "prompt": "I need a practical medical_radiotherapy-style setup: target as box 180 mm x 90 mm x 60 mm made of G4_Fe, with a point e- source at 1.25 MeV from (0,0,-170) mm heading (0,0,1), physics list FTFP_BERT, and json output.",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C23",
+      "domain": "detector_rnd",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_Pb",
+        "source.type": "beam",
+        "source.particle": "proton",
+        "output.format": "csv"
+      },
+      "prompt": "????? ?? 73 mm ?? 52 mm??? G4_Pb?source.type=beam?particle=proton?energy=2.00 MeV?position=(0,0,-200) mm?direction=(0,0,1)?physics=QGSP_BERT_HP?output=csv?",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C24",
+      "domain": "accelerator_ops",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_W",
+        "source.type": "isotropic",
+        "source.particle": "neutron",
+        "output.format": "hdf5"
+      },
+      "prompt": "I need a practical medical_radiotherapy-style setup: target as sphere radius 80 mm made of G4_W, with a isotropic neutron source at 2.75 MeV from (0,0,-230) mm heading (0,0,1), physics list Shielding, and hdf5 output.",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C25",
+      "domain": "emergency_response",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Cu",
+        "source.type": "point",
+        "source.particle": "gamma",
+        "output.format": "xml"
+      },
+      "prompt": "????? 80 mm x 135 mm x 30 mm??? G4_Cu?source.type=point?particle=gamma?energy=3.50 MeV?position=(0,0,-80) mm?direction=(0,0,1)?physics=QBBC?output=xml?",
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      }
+    },
+    {
+      "id": "V2C26",
+      "domain": "medical_nuclear_medicine",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_Al",
+        "source.type": "beam",
+        "source.particle": "e-",
+        "output.format": "root"
+      },
+      "prompt": "I am doing medical_nuclear_medicine and need a starter simulation; ask only essential missing parameters first.",
+      "followup_turns": [
+        "I need a practical medical_radiotherapy-style setup: target as cylinder radius 33 mm half-length 88 mm made of G4_Al, with a beam e- source at 4.25 MeV from (0,0,-110) mm heading (0,0,1), physics list FTFP_BERT, and root output."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C27",
+      "domain": "medical_proton_therapy",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_Si",
+        "source.type": "isotropic",
+        "source.particle": "proton",
+        "output.format": "json"
+      },
+      "prompt": "??? medical_proton_therapy ??? Geant4 ????????????????????",
+      "followup_turns": [
+        "???? ?? 107 mm??? G4_Si?source.type=isotropic?particle=proton?energy=5.00 MeV?position=(0,0,-140) mm?direction=(0,0,1)?physics=QGSP_BERT_HP?output=json?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C28",
+      "domain": "satellite_payload",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_WATER",
+        "source.type": "point",
+        "source.particle": "neutron",
+        "output.format": "csv"
+      },
+      "prompt": "I am doing satellite_payload and need a starter simulation; ask only essential missing parameters first.",
+      "followup_turns": [
+        "I need a practical medical_radiotherapy-style setup: target as box 140 mm x 180 mm x 60 mm made of G4_WATER, with a point neutron source at 5.75 MeV from (0,0,-170) mm heading (0,0,1), physics list Shielding, and csv output."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C29",
+      "domain": "spacecraft_habitat",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_AIR",
+        "source.type": "beam",
+        "source.particle": "gamma",
+        "output.format": "hdf5"
+      },
+      "prompt": "??? spacecraft_habitat ??? Geant4 ????????????????????",
+      "followup_turns": [
+        "????? ?? 57 mm ?? 40 mm??? G4_AIR?source.type=beam?particle=gamma?energy=6.50 MeV?position=(0,0,-200) mm?direction=(0,0,1)?physics=QBBC?output=hdf5?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C30",
+      "domain": "chip_single_event",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_Fe",
+        "source.type": "isotropic",
+        "source.particle": "e-",
+        "output.format": "xml"
+      },
+      "prompt": "I am doing chip_single_event and need a starter simulation; ask only essential missing parameters first.",
+      "followup_turns": [
+        "I need a practical medical_radiotherapy-style setup: target as sphere radius 53 mm made of G4_Fe, with a isotropic e- source at 7.25 MeV from (0,0,-230) mm heading (0,0,1), physics list FTFP_BERT, and xml output."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C31",
+      "domain": "cargo_portal",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Pb",
+        "source.type": "point",
+        "source.particle": "proton",
+        "output.format": "root"
+      },
+      "prompt": "??? cargo_portal ??? Geant4 ????????????????????",
+      "followup_turns": [
+        "????? 200 mm x 120 mm x 30 mm??? G4_Pb?source.type=point?particle=proton?energy=0.50 MeV?position=(0,0,-80) mm?direction=(0,0,1)?physics=QGSP_BERT_HP?output=root?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C32",
+      "domain": "airport_ct",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_W",
+        "source.type": "beam",
+        "source.particle": "neutron",
+        "output.format": "json"
+      },
+      "prompt": "I am doing airport_ct and need a starter simulation; ask only essential missing parameters first.",
+      "followup_turns": [
+        "I need a practical medical_radiotherapy-style setup: target as cylinder radius 81 mm half-length 76 mm made of G4_W, with a beam neutron source at 1.25 MeV from (0,0,-110) mm heading (0,0,1), physics list Shielding, and json output."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C33",
+      "domain": "reactor_shielding",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_Cu",
+        "source.type": "isotropic",
+        "source.particle": "gamma",
+        "output.format": "csv"
+      },
+      "prompt": "??? reactor_shielding ??? Geant4 ????????????????????",
+      "followup_turns": [
+        "???? ?? 80 mm??? G4_Cu?source.type=isotropic?particle=gamma?energy=2.00 MeV?position=(0,0,-140) mm?direction=(0,0,1)?physics=QBBC?output=csv?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C34",
+      "domain": "waste_monitoring",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Al",
+        "source.type": "point",
+        "source.particle": "e-",
+        "output.format": "hdf5"
+      },
+      "prompt": "I am doing waste_monitoring and need a starter simulation; ask only essential missing parameters first.",
+      "followup_turns": [
+        "I need a practical medical_radiotherapy-style setup: target as box 100 mm x 165 mm x 60 mm made of G4_Al, with a point e- source at 2.75 MeV from (0,0,-170) mm heading (0,0,1), physics list FTFP_BERT, and hdf5 output."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C35",
+      "domain": "atmospheric_science",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_Si",
+        "source.type": "beam",
+        "source.particle": "proton",
+        "output.format": "xml"
+      },
+      "prompt": "??? atmospheric_science ??? Geant4 ????????????????????",
+      "followup_turns": [
+        "????? ?? 41 mm ?? 112 mm??? G4_Si?source.type=beam?particle=proton?energy=3.50 MeV?position=(0,0,-200) mm?direction=(0,0,1)?physics=QGSP_BERT_HP?output=xml?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C36",
+      "domain": "particle_detector_calib",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_WATER",
+        "source.type": "isotropic",
+        "source.particle": "neutron",
+        "output.format": "root"
+      },
+      "prompt": "I am doing particle_detector_calib and need a starter simulation; ask only essential missing parameters first.",
+      "followup_turns": [
+        "I need a practical medical_radiotherapy-style setup: target as sphere radius 107 mm made of G4_WATER, with a isotropic neutron source at 4.25 MeV from (0,0,-230) mm heading (0,0,1), physics list Shielding, and root output."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C37",
+      "domain": "teaching_lab",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_AIR",
+        "source.type": "point",
+        "source.particle": "gamma",
+        "output.format": "json"
+      },
+      "prompt": "??? teaching_lab ??? Geant4 ????????????????????",
+      "followup_turns": [
+        "????? 160 mm x 105 mm x 30 mm??? G4_AIR?source.type=point?particle=gamma?energy=5.00 MeV?position=(0,0,-80) mm?direction=(0,0,1)?physics=QBBC?output=json?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C38",
+      "domain": "well_logging_tools",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_Fe",
+        "source.type": "beam",
+        "source.particle": "e-",
+        "output.format": "csv"
+      },
+      "prompt": "I am doing well_logging_tools and need a starter simulation; ask only essential missing parameters first.",
+      "followup_turns": [
+        "I need a practical medical_radiotherapy-style setup: target as cylinder radius 65 mm half-length 64 mm made of G4_Fe, with a beam e- source at 5.75 MeV from (0,0,-110) mm heading (0,0,1), physics list FTFP_BERT, and csv output."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C39",
+      "domain": "ocean_sensor_hardening",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_Pb",
+        "source.type": "isotropic",
+        "source.particle": "proton",
+        "output.format": "hdf5"
+      },
+      "prompt": "??? ocean_sensor_hardening ??? Geant4 ????????????????????",
+      "followup_turns": [
+        "???? ?? 53 mm??? G4_Pb?source.type=isotropic?particle=proton?energy=6.50 MeV?position=(0,0,-140) mm?direction=(0,0,1)?physics=QGSP_BERT_HP?output=hdf5?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C40",
+      "domain": "crop_mutation_study",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_W",
+        "source.type": "point",
+        "source.particle": "neutron",
+        "output.format": "xml"
+      },
+      "prompt": "I am doing crop_mutation_study and need a starter simulation; ask only essential missing parameters first.",
+      "followup_turns": [
+        "I need a practical medical_radiotherapy-style setup: target as box 220 mm x 150 mm x 60 mm made of G4_W, with a point neutron source at 7.25 MeV from (0,0,-170) mm heading (0,0,1), physics list Shielding, and xml output."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C41",
+      "domain": "food_packaging_validation",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_Cu",
+        "source.type": "beam",
+        "source.particle": "gamma",
+        "output.format": "root"
+      },
+      "prompt": "??? food_packaging_validation ??? Geant4 ????????????????????",
+      "followup_turns": [
+        "????? ?? 25 mm ?? 100 mm??? G4_Cu?source.type=beam?particle=gamma?energy=0.50 MeV?position=(0,0,-200) mm?direction=(0,0,1)?physics=QBBC?output=root?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C42",
+      "domain": "heritage_conservation",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_Al",
+        "source.type": "isotropic",
+        "source.particle": "e-",
+        "output.format": "json"
+      },
+      "prompt": "I am doing heritage_conservation and need a starter simulation; ask only essential missing parameters first.",
+      "followup_turns": [
+        "I need a practical medical_radiotherapy-style setup: target as sphere radius 80 mm made of G4_Al, with a isotropic e- source at 1.25 MeV from (0,0,-230) mm heading (0,0,1), physics list FTFP_BERT, and json output."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C43",
+      "domain": "mineral_screening",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Si",
+        "source.type": "point",
+        "source.particle": "proton",
+        "output.format": "csv"
+      },
+      "prompt": "??? mineral_screening ??? Geant4 ????????????????????",
+      "followup_turns": [
+        "????? 120 mm x 90 mm x 30 mm??? G4_Si?source.type=point?particle=proton?energy=2.00 MeV?position=(0,0,-80) mm?direction=(0,0,1)?physics=QGSP_BERT_HP?output=csv?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C44",
+      "domain": "ev_battery_safety",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_WATER",
+        "source.type": "beam",
+        "source.particle": "neutron",
+        "output.format": "hdf5"
+      },
+      "prompt": "I am doing ev_battery_safety and need a starter simulation; ask only essential missing parameters first.",
+      "followup_turns": [
+        "I need a practical medical_radiotherapy-style setup: target as cylinder radius 49 mm half-length 52 mm made of G4_WATER, with a beam neutron source at 2.75 MeV from (0,0,-110) mm heading (0,0,1), physics list Shielding, and hdf5 output."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C45",
+      "domain": "autonomous_vehicle_radiation",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_AIR",
+        "source.type": "isotropic",
+        "source.particle": "gamma",
+        "output.format": "xml"
+      },
+      "prompt": "??? autonomous_vehicle_radiation ??? Geant4 ????????????????????",
+      "followup_turns": [
+        "???? ?? 107 mm??? G4_AIR?source.type=isotropic?particle=gamma?energy=3.50 MeV?position=(0,0,-140) mm?direction=(0,0,1)?physics=QBBC?output=xml?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C46",
+      "domain": "tokamak_diagnostics",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Fe",
+        "source.type": "point",
+        "source.particle": "e-",
+        "output.format": "root"
+      },
+      "prompt": "I am doing tokamak_diagnostics and need a starter simulation; ask only essential missing parameters first.",
+      "followup_turns": [
+        "I need a practical medical_radiotherapy-style setup: target as box 180 mm x 135 mm x 60 mm made of G4_Fe, with a point e- source at 4.25 MeV from (0,0,-170) mm heading (0,0,1), physics list FTFP_BERT, and root output."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C47",
+      "domain": "lunar_surface_ops",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_Pb",
+        "source.type": "beam",
+        "source.particle": "proton",
+        "output.format": "json"
+      },
+      "prompt": "??? lunar_surface_ops ??? Geant4 ????????????????????",
+      "followup_turns": [
+        "????? ?? 73 mm ?? 88 mm??? G4_Pb?source.type=beam?particle=proton?energy=5.00 MeV?position=(0,0,-200) mm?direction=(0,0,1)?physics=QGSP_BERT_HP?output=json?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C48",
+      "domain": "hospital_physics_qc",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_W",
+        "source.type": "isotropic",
+        "source.particle": "neutron",
+        "output.format": "csv"
+      },
+      "prompt": "I am doing hospital_physics_qc and need a starter simulation; ask only essential missing parameters first.",
+      "followup_turns": [
+        "I need a practical medical_radiotherapy-style setup: target as sphere radius 53 mm made of G4_W, with a isotropic neutron source at 5.75 MeV from (0,0,-230) mm heading (0,0,1), physics list Shielding, and csv output."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C49",
+      "domain": "synchrotron_beamline",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Cu",
+        "source.type": "point",
+        "source.particle": "gamma",
+        "output.format": "hdf5"
+      },
+      "prompt": "??? synchrotron_beamline ??? Geant4 ????????????????????",
+      "followup_turns": [
+        "????? 80 mm x 180 mm x 30 mm??? G4_Cu?source.type=point?particle=gamma?energy=6.50 MeV?position=(0,0,-80) mm?direction=(0,0,1)?physics=QBBC?output=hdf5?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    },
+    {
+      "id": "V2C50",
+      "domain": "radiation_safety_drill",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_Al",
+        "source.type": "beam",
+        "source.particle": "e-",
+        "output.format": "xml"
+      },
+      "prompt": "I am doing radiation_safety_drill and need a starter simulation; ask only essential missing parameters first.",
+      "followup_turns": [
+        "I need a practical medical_radiotherapy-style setup: target as cylinder radius 33 mm half-length 40 mm made of G4_Al, with a beam e- source at 7.25 MeV from (0,0,-110) mm heading (0,0,1), physics list FTFP_BERT, and xml output."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      }
+    }
+  ]
+}

@@ -72,8 +72,9 @@ def _grounded_summary(config: dict[str, Any], *, lang: str) -> str:
     particle = _safe_str(_get_path(config, "source.particle")) or ("未指定" if lang == "zh" else "not set")
     if lang == "zh":
         return (
-            f"当前已提交配置为：物理列表 {physics}，输出格式 {output_fmt}，"
-            f"源类型 {source_type}，粒子 {particle}。如需修改，请直接说明要改哪一项。"
+            f"当前已提交的配置是：物理列表 {physics}，输出格式 {output_fmt}，"
+            f"源类型 {source_type}，粒子 {particle}。"
+            "如果需要修改，请直接说明要改哪一项。"
         )
     return (
         f"Current committed config is: physics list {physics}, output format {output_fmt}, "
@@ -90,4 +91,3 @@ def enforce_message_grounding(message: str, *, config: dict[str, Any], action: s
     if _conflicts(message, config=config):
         return _grounded_summary(config, lang=lang)
     return message
-

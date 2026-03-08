@@ -6,8 +6,10 @@ from pathlib import Path
 from typing import Any
 
 from core.semantic_frame import SemanticFrame
+from core.geometry.dialogue_registry import graph_dialogue_missing_paths
+from builder.geometry.synthesize import synthesize_from_params
 from nlu.runtime_components.graph_search import search_candidate_graphs
-from nlu.runtime_components.infer import extract_params
+from nlu.runtime_components.infer import extract_params, predict_structure
 from nlu.runtime_components.infer import _require_local_model_dir
 from nlu.runtime_components.postprocess import merge_params
 
@@ -20,20 +22,50 @@ _CACHE: dict[str, list[str]] | None = None
 
 MATERIAL_ALIASES = {
     "air": "G4_AIR",
+    "\u7a7a\u6c14": "G4_AIR",
+    "g4_air": "G4_AIR",
     "water": "G4_WATER",
+    "\u6c34": "G4_WATER",
+    "g4_water": "G4_WATER",
+    "cesium iodide": "G4_CESIUM_IODIDE",
+    "caesium iodide": "G4_CESIUM_IODIDE",
+    "csi": "G4_CESIUM_IODIDE",
+    "g4_csi": "G4_CESIUM_IODIDE",
+    "g4_cesium_iodide": "G4_CESIUM_IODIDE",
+    "g4_cesium-iodide": "G4_CESIUM_IODIDE",
     "silicon": "G4_Si",
     "si": "G4_Si",
+    "\u7845": "G4_Si",
+    "g4_si": "G4_Si",
     "copper": "G4_Cu",
     "cu": "G4_Cu",
+    "\u94dc": "G4_Cu",
+    "g4_cu": "G4_Cu",
     "aluminum": "G4_Al",
     "aluminium": "G4_Al",
     "al": "G4_Al",
+    "\u94dd": "G4_Al",
+    "g4_al": "G4_Al",
+    "concrete": "G4_CONCRETE",
+    "\u6df7\u51dd\u571f": "G4_CONCRETE",
+    "g4_concrete": "G4_CONCRETE",
     "iron": "G4_Fe",
     "fe": "G4_Fe",
+    "\u94c1": "G4_Fe",
+    "g4_fe": "G4_Fe",
+    "steel": "G4_STAINLESS-STEEL",
+    "stainless steel": "G4_STAINLESS-STEEL",
+    "\u94a2": "G4_STAINLESS-STEEL",
+    "g4_stainless-steel": "G4_STAINLESS-STEEL",
+    "g4_stainless_steel": "G4_STAINLESS-STEEL",
     "lead": "G4_Pb",
     "pb": "G4_Pb",
+    "\u94c5": "G4_Pb",
+    "g4_pb": "G4_Pb",
     "tungsten": "G4_W",
     "w": "G4_W",
+    "\u94a8": "G4_W",
+    "g4_w": "G4_W",
 }
 
 PARTICLE_ALIASES = {
@@ -51,13 +83,27 @@ SOURCE_TYPE_ALIASES = {
     "\u70b9\u6e90": "point",
     "\u70b9\u72b6\u6e90": "point",
     "beam": "beam",
+    "pencil beam": "beam",
+    "collimated beam": "beam",
     "\u675f\u6d41": "beam",
     "\u7c92\u5b50\u675f": "beam",
+    "\u51c6\u76f4\u675f": "beam",
     "isotropic": "isotropic",
     "\u5404\u5411\u540c\u6027": "isotropic",
     "plane source": "plane",
     "plane": "plane",
     "\u9762\u6e90": "plane",
+}
+
+FALLBACK_GRAPH_STRUCTURE = {
+    "ring_modules": "ring",
+    "grid_modules": "grid",
+    "nest_box_tubs": "nest",
+    "stack_in_box": "stack",
+    "shell_nested": "shell",
+    "boolean_union_boxes": "boolean",
+    "boolean_subtraction_boxes": "boolean",
+    "boolean_intersection_boxes": "boolean",
 }
 
 
@@ -109,6 +155,20 @@ def _pick_ner_model() -> str:
     return _require_local_model_dir(p, label="NER")
 
 
+def _pick_structure_model() -> str | None:
+    candidates = [
+        MODELS_DIR / "structure_router_v3",
+        MODELS_DIR / "structure_controlled_v5_e2",
+        MODELS_DIR / "structure_controlled_v4c_e1",
+        MODELS_DIR / "structure_controlled_v3_e1",
+        MODELS_DIR / "structure",
+    ]
+    for p in candidates:
+        if (p / "config.json").exists():
+            return str(p)
+    return None
+
+
 def _candidate_payload(candidate: Any) -> dict[str, Any]:
     return {
         "structure": candidate.summary,
@@ -122,37 +182,126 @@ def _candidate_payload(candidate: Any) -> dict[str, Any]:
     }
 
 
+def _normalize_graph_program_root(structure: str | None, graph_program: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(graph_program, dict):
+        return graph_program
+    normalized = dict(graph_program)
+    if structure == "stack":
+        normalized["root"] = "stack"
+    elif structure == "shell":
+        normalized["root"] = "shell"
+    elif structure == "boolean":
+        normalized["root"] = "boolean"
+    return normalized
+
+
+def _fallback_structure_from_skeleton(chosen_skeleton: str) -> str:
+    return FALLBACK_GRAPH_STRUCTURE.get(str(chosen_skeleton or "").strip(), "")
+
+
+def _committed_geometry_params(
+    explicit_params: dict[str, float],
+    candidate_params: dict[str, float],
+    missing_params: list[str],
+) -> dict[str, float]:
+    if not candidate_params:
+        return dict(explicit_params)
+    if not missing_params:
+        return dict(candidate_params)
+    committed = dict(explicit_params)
+    for key in explicit_params:
+        if key in candidate_params:
+            committed[key] = candidate_params[key]
+    return committed
+
+
+def _fallback_dialogue_skeleton(text: str) -> str:
+    low = text.lower()
+    if any(token in low for token in ("intersection", "intersect", "相交", "交集")):
+        return "boolean_intersection_boxes"
+    if any(
+        token in low
+        for token in ("subtraction", "subtract", "minus", "difference", "hole", "cut out", "cutout", "减去", "差集", "挖空", "开孔", "打孔")
+    ):
+        return "boolean_subtraction_boxes"
+    if any(token in low for token in ("union", "boolean", "combine", "merge", "并", "合并", "并集")):
+        return "boolean_union_boxes"
+    if any(token in low for token in ("ring", "annulus", "circular", "环", "环形", "圆环")):
+        return "ring_modules"
+    if any(token in low for token in ("grid", "array", "matrix", "阵列", "二维阵列", "探测板")):
+        return "grid_modules"
+    if any(token in low for token in ("stack", "layers", "layer", "stacked", "sandwich", "堆叠", "夹层", "层")):
+        return "stack_in_box"
+    if any(token in low for token in ("shell", "concentric", "coaxial", "壳", "同心", "屏蔽壳")):
+        return "shell_nested"
+    if any(token in low for token in ("nest", "inside", "contains", "inner", "outer", "嵌套", "内嵌", "外盒", "盒子里")):
+        return "nest_box_tubs"
+    return ""
+
+
 def extract_runtime_semantic_frame(
     text: str,
     *,
+    normalized_text: str = "",
     min_confidence: float = 0.6,
     device: str = "auto",
     context_summary: str = "",
+    apply_autofix: bool = False,
 ) -> tuple[SemanticFrame, dict[str, Any]]:
     _ = context_summary
     frame = SemanticFrame()
+    graph_text = text
+    param_text = text
+    if normalized_text and normalized_text.strip():
+        param_text = f"{text} ; {normalized_text}".strip(" ;")
     debug: dict[str, Any] = {
         "inference_backend": "runtime_semantic",
         "requires_llm_normalization": False,
-        "normalized_text": text,
+        "normalized_text": normalized_text or text,
+        "graph_text": graph_text,
+        "param_text": param_text,
         "normalization": {"enabled": False, "used": False},
     }
 
     params: dict[str, float] = {}
     try:
-        params = extract_params(text, _pick_ner_model(), device)
+        params = extract_params(param_text, _pick_ner_model(), device)
     except Exception as ex:
         debug["ner_error"] = str(ex)
-    params, notes = merge_params(text, params)
+    params, notes = merge_params(param_text, params)
     frame.notes.extend(notes)
 
+    structure_model = _pick_structure_model()
+    structure_prior_label = ""
+    structure_prior_confidence = 0.0
+    if structure_model:
+        try:
+            prior_label, prior_scores, prior_ranked = predict_structure(
+                graph_text,
+                structure_model,
+                device=device,
+                min_confidence=min_confidence,
+            )
+            structure_prior_label = str(prior_label or "")
+            structure_prior_confidence = float(prior_scores.get(structure_prior_label, 0.0))
+            debug["structure_prior"] = {
+                "label": structure_prior_label,
+                "confidence": structure_prior_confidence,
+                "ranked": list(prior_ranked),
+                "model": structure_model,
+            }
+        except Exception as ex:
+            debug["structure_prior_error"] = str(ex)
+
     graph_result = search_candidate_graphs(
-        text,
+        graph_text,
         params,
         min_confidence=min_confidence,
         seed=7,
         top_k=3,
-        apply_autofix=False,
+        apply_autofix=apply_autofix,
+        prior_summary=structure_prior_label,
+        prior_confidence=structure_prior_confidence,
     )
     frame.notes.extend(graph_result.notes)
     debug["scores"] = dict(graph_result.scores)
@@ -160,41 +309,83 @@ def extract_runtime_semantic_frame(
     debug["graph_candidates"] = [_candidate_payload(c) for c in graph_result.candidates]
 
     chosen_candidate = None
+    fallback_synth: dict[str, Any] | None = None
     if graph_result.chosen_skeleton:
         for candidate in graph_result.candidates:
             if candidate.structure == graph_result.chosen_skeleton:
                 chosen_candidate = candidate
                 break
+    dialogue_skeleton = graph_result.chosen_skeleton or _fallback_dialogue_skeleton(text)
+    dialogue_structure = graph_result.structure
+    dialogue_missing_params: list[str] = []
+    if chosen_candidate is not None:
+        dialogue_missing_params = list(chosen_candidate.missing_params)
+    elif dialogue_skeleton:
+        fallback_synth = synthesize_from_params(dialogue_skeleton, params, seed=7, apply_autofix=apply_autofix)
+        dialogue_missing_params = list(fallback_synth.get("missing_params", []))
+        if dialogue_structure == "unknown":
+            dialogue_structure = _fallback_structure_from_skeleton(dialogue_skeleton) or str(
+                fallback_synth.get("structure", "") or ""
+            )
+    debug["graph_choice"] = {
+        "structure": dialogue_structure,
+        "chosen_skeleton": dialogue_skeleton,
+        "missing_params": dialogue_missing_params,
+        "dialogue_missing_paths": graph_dialogue_missing_paths(
+            dialogue_skeleton,
+            dialogue_missing_params,
+        ),
+    }
 
     if graph_result.structure != "unknown":
         frame.geometry.structure = graph_result.structure
+    elif dialogue_structure:
+        frame.geometry.structure = dialogue_structure
     if graph_result.chosen_skeleton:
         frame.geometry.chosen_skeleton = graph_result.chosen_skeleton
+    elif dialogue_skeleton:
+        frame.geometry.chosen_skeleton = dialogue_skeleton
     if graph_result.graph_program is not None:
-        frame.geometry.graph_program = graph_result.graph_program
+        frame.geometry.graph_program = _normalize_graph_program_root(
+            graph_result.structure,
+            graph_result.graph_program,
+        )
+    elif fallback_synth is not None and isinstance(fallback_synth.get("dsl"), dict):
+        fallback_structure = frame.geometry.structure or dialogue_structure
+        frame.geometry.graph_program = _normalize_graph_program_root(
+            fallback_structure,
+            dict(fallback_synth.get("dsl", {})),
+        )
+
     if chosen_candidate is not None:
-        frame.geometry.params.update(chosen_candidate.params_filled)
+        frame.geometry.params.update(
+            _committed_geometry_params(
+                params,
+                chosen_candidate.params_filled,
+                chosen_candidate.missing_params,
+            )
+        )
     else:
         frame.geometry.params.update(params)
 
     knowledge = _load_knowledge()
-    material = _match_any(text, knowledge["materials"]) or _alias_match(text, MATERIAL_ALIASES, knowledge["materials"])
+    material = _match_any(param_text, knowledge["materials"]) or _alias_match(param_text, MATERIAL_ALIASES, knowledge["materials"])
     if material:
         frame.materials.selected_materials = [material]
 
-    particle = _match_any(text, knowledge["particles"]) or _alias_match(text, PARTICLE_ALIASES, knowledge["particles"])
+    particle = _match_any(param_text, knowledge["particles"]) or _alias_match(param_text, PARTICLE_ALIASES, knowledge["particles"])
     if particle:
         frame.source.particle = particle
 
-    source_type = _match_any(text, knowledge["source_types"]) or _alias_match(text, SOURCE_TYPE_ALIASES, knowledge["source_types"])
+    source_type = _match_any(param_text, knowledge["source_types"]) or _alias_match(param_text, SOURCE_TYPE_ALIASES, knowledge["source_types"])
     if source_type:
         frame.source.type = source_type
 
-    physics_list = _match_any(text, knowledge["physics_lists"])
+    physics_list = _match_any(param_text, knowledge["physics_lists"])
     if physics_list:
         frame.physics.physics_list = physics_list
 
-    output_format = _match_any(text, knowledge["output_formats"])
+    output_format = _match_any(param_text, knowledge["output_formats"])
     if output_format:
         frame.output.format = output_format
 

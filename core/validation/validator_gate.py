@@ -8,6 +8,65 @@ from core.validation.error_codes import E_NAME_BINDING, E_RANGE_INVALID, E_REQUI
 from core.validation.geometry_registry import get_geometry_family, prune_out_of_scope_params
 from core.validation.minimal_schema import get_minimal_required_paths
 
+_POSITIVE_NUMERIC_PATHS = {
+    "geometry.params.module_x",
+    "geometry.params.module_y",
+    "geometry.params.module_z",
+    "geometry.params.child_rmax",
+    "geometry.params.child_hz",
+    "geometry.params.rmax1",
+    "geometry.params.rmax2",
+    "geometry.params.x1",
+    "geometry.params.x2",
+    "geometry.params.y1",
+    "geometry.params.y2",
+    "geometry.params.r1",
+    "geometry.params.r2",
+    "geometry.params.r3",
+    "geometry.params.trap_x1",
+    "geometry.params.trap_x2",
+    "geometry.params.trap_x3",
+    "geometry.params.trap_x4",
+    "geometry.params.trap_y1",
+    "geometry.params.trap_y2",
+    "geometry.params.trap_z",
+    "geometry.params.para_x",
+    "geometry.params.para_y",
+    "geometry.params.para_z",
+    "geometry.params.torus_rtor",
+    "geometry.params.torus_rmax",
+    "geometry.params.ellipsoid_ax",
+    "geometry.params.ellipsoid_by",
+    "geometry.params.ellipsoid_cz",
+    "geometry.params.elltube_ax",
+    "geometry.params.elltube_by",
+    "geometry.params.elltube_hz",
+    "geometry.params.polyhedra_nsides",
+    "geometry.params.bool_a_x",
+    "geometry.params.bool_a_y",
+    "geometry.params.bool_a_z",
+    "geometry.params.bool_b_x",
+    "geometry.params.bool_b_y",
+    "geometry.params.bool_b_z",
+}
+
+_FINITE_NUMERIC_PATHS = {
+    "geometry.params.z1",
+    "geometry.params.z2",
+    "geometry.params.z3",
+    "geometry.params.tilt_x",
+    "geometry.params.tilt_y",
+    "geometry.params.para_alpha",
+    "geometry.params.para_theta",
+    "geometry.params.para_phi",
+    "geometry.params.tx",
+    "geometry.params.ty",
+    "geometry.params.tz",
+    "geometry.params.rx",
+    "geometry.params.ry",
+    "geometry.params.rz",
+}
+
 
 def _is_missing(value: Any) -> bool:
     if value is None:
@@ -34,20 +93,14 @@ def validate_layer_a_params(config: dict, registry: dict | None = None) -> Valid
     errors: list[dict] = []
     missing: list[str] = []
 
-    for path in (
-        "geometry.params.module_x",
-        "geometry.params.module_y",
-        "geometry.params.module_z",
-        "geometry.params.child_rmax",
-        "geometry.params.child_hz",
-    ):
+    for path in sorted(_POSITIVE_NUMERIC_PATHS | _FINITE_NUMERIC_PATHS):
         val = get_path(config, path)
         if _is_missing(val):
             continue
         if not isinstance(val, (int, float)):
             errors.append({"code": E_TYPE_INVALID, "path": path, "message": "must be number"})
             continue
-        if float(val) <= 0:
+        if path in _POSITIVE_NUMERIC_PATHS and float(val) <= 0:
             errors.append({"code": E_RANGE_INVALID, "path": path, "message": "must be > 0"})
 
     energy = get_path(config, "source.energy")
@@ -87,6 +140,10 @@ def validate_layer_b_consistency(config: dict, registry: dict | None = None) -> 
     vmap = get_path(config, "materials.volume_material_map", {})
     if isinstance(vmap, dict) and vmap:
         geo_root = str(get_path(config, "geometry.root_name", "") or "").strip()
+        if not geo_root:
+            graph_program = get_path(config, "geometry.graph_program", {})
+            if isinstance(graph_program, dict):
+                geo_root = str(graph_program.get("root", "") or "").strip()
         if not geo_root:
             # Default root aliases for current prototype
             geo_root = "box" if structure == "single_box" else "target"

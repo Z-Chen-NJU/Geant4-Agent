@@ -9,6 +9,7 @@ from core.config.llm_prompt_registry import (
     build_strict_slot_prompt,
 )
 from core.config.output_format_registry import canonical_output_format
+from core.geometry.family_catalog import SUPPORTED_GEOMETRY_KINDS
 from core.orchestrator.types import Intent
 from core.slots.slot_frame import SlotFrame
 from core.slots.slot_validator import validate_slot_frame
@@ -19,6 +20,11 @@ from core.validation.error_codes import (
     E_LLM_SLOT_SCHEMA_INVALID,
 )
 from nlu.bert_lab.ollama_client import chat, extract_json
+from nlu.uncertainty import (
+    has_grounded_payload_for_target,
+    has_uncertainty_signal,
+    infer_unresolved_targets,
+)
 
 
 _INTENT_MAP = {x.value: x for x in Intent}
@@ -33,6 +39,42 @@ _GEOMETRY_ALIASES = {
     "single_tubs": "cylinder",
     "sphere": "sphere",
     "single_sphere": "sphere",
+    "orb": "orb",
+    "single_orb": "orb",
+    "cons": "cons",
+    "cone": "cons",
+    "frustum": "cons",
+    "single_cons": "cons",
+    "trd": "trd",
+    "trapezoid": "trd",
+    "trapezoidal": "trd",
+    "single_trd": "trd",
+    "polycone": "polycone",
+    "single_polycone": "polycone",
+    "polyhedra": "polyhedra",
+    "polyhedron": "polyhedra",
+    "single_polyhedra": "polyhedra",
+    "cuttubs": "cuttubs",
+    "cut tubs": "cuttubs",
+    "single_cuttubs": "cuttubs",
+    "trap": "trap",
+    "single_trap": "trap",
+    "para": "para",
+    "parallelepiped": "para",
+    "skewed box": "para",
+    "single_para": "para",
+    "torus": "torus",
+    "donut": "torus",
+    "ring tube": "torus",
+    "single_torus": "torus",
+    "ellipsoid": "ellipsoid",
+    "elliptic": "ellipsoid",
+    "single_ellipsoid": "ellipsoid",
+    "elltube": "elltube",
+    "elliptical tube": "elltube",
+    "ellipse tube": "elltube",
+    "elliptic tube": "elltube",
+    "single_elltube": "elltube",
 }
 _SOURCE_ALIASES = {
     "point": "point",
@@ -55,6 +97,12 @@ _MATERIAL_ALIASES = {
     "\u7a7a\u6c14": "G4_AIR",
     "water": "G4_WATER",
     "\u6c34": "G4_WATER",
+    "cesium iodide": "G4_CESIUM_IODIDE",
+    "caesium iodide": "G4_CESIUM_IODIDE",
+    "csi": "G4_CESIUM_IODIDE",
+    "g4_csi": "G4_CESIUM_IODIDE",
+    "g4_cesium_iodide": "G4_CESIUM_IODIDE",
+    "g4_cesium-iodide": "G4_CESIUM_IODIDE",
     "silicon": "G4_Si",
     "si": "G4_Si",
     "\u7845": "G4_Si",
@@ -69,12 +117,20 @@ _MATERIAL_ALIASES = {
     "\u94dd": "G4_Al",
     "iron": "G4_Fe",
     "fe": "G4_Fe",
+    "g4_fe": "G4_Fe",
     "\u94c1": "G4_Fe",
+    "steel": "G4_STAINLESS-STEEL",
+    "stainless steel": "G4_STAINLESS-STEEL",
+    "\u94a2": "G4_STAINLESS-STEEL",
+    "g4_stainless-steel": "G4_STAINLESS-STEEL",
+    "g4_stainless_steel": "G4_STAINLESS-STEEL",
     "lead": "G4_Pb",
     "pb": "G4_Pb",
+    "g4_pb": "G4_Pb",
     "\u94c5": "G4_Pb",
     "tungsten": "G4_W",
     "w": "G4_W",
+    "g4_w": "G4_W",
     "\u94a8": "G4_W",
 }
 _NULL_LITERALS = {"null", "none", "n/a", "na", "unknown", "\u65e0", "\u672a\u77e5", "\u7a7a"}
@@ -160,7 +216,7 @@ def _coerce_length_mm(value: Any) -> float | None:
     try:
         return float(text)
     except ValueError:
-        m = re.fullmatch(r"([-+]?\d*\.?\d+)\s*(mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)", text)
+        m = re.fullmatch(r"([-+]?\d*\.?\d+)\s*(mm|cm|m|毫米|厘米|米)", text)
         if not m:
             return None
         return _to_mm(float(m.group(1)), m.group(2))
@@ -240,7 +296,7 @@ def _canonical_geometry_kind(value: Any) -> str | None:
     text = (_clean_scalar(value) or "").lower()
     if not text:
         return None
-    return _GEOMETRY_ALIASES.get(text, text if text in _GEOMETRY_ALIASES.values() else None)
+    return _GEOMETRY_ALIASES.get(text, text if text in SUPPORTED_GEOMETRY_KINDS else None)
 
 
 def _canonical_source_kind(value: Any) -> str | None:
@@ -271,6 +327,72 @@ def _present_slot_paths(frame: SlotFrame) -> set[str]:
         paths.add("geometry.radius_mm")
     if frame.geometry.half_length_mm is not None:
         paths.add("geometry.half_length_mm")
+    if frame.geometry.radius1_mm is not None:
+        paths.add("geometry.radius1_mm")
+    if frame.geometry.radius2_mm is not None:
+        paths.add("geometry.radius2_mm")
+    if frame.geometry.x1_mm is not None:
+        paths.add("geometry.x1_mm")
+    if frame.geometry.x2_mm is not None:
+        paths.add("geometry.x2_mm")
+    if frame.geometry.y1_mm is not None:
+        paths.add("geometry.y1_mm")
+    if frame.geometry.y2_mm is not None:
+        paths.add("geometry.y2_mm")
+    if frame.geometry.z_mm is not None:
+        paths.add("geometry.z_mm")
+    if frame.geometry.z_planes_mm:
+        paths.add("geometry.z_planes_mm")
+    if frame.geometry.radii_mm:
+        paths.add("geometry.radii_mm")
+    if frame.geometry.trap_x1_mm is not None:
+        paths.add("geometry.trap_x1_mm")
+    if frame.geometry.trap_x2_mm is not None:
+        paths.add("geometry.trap_x2_mm")
+    if frame.geometry.trap_x3_mm is not None:
+        paths.add("geometry.trap_x3_mm")
+    if frame.geometry.trap_x4_mm is not None:
+        paths.add("geometry.trap_x4_mm")
+    if frame.geometry.trap_y1_mm is not None:
+        paths.add("geometry.trap_y1_mm")
+    if frame.geometry.trap_y2_mm is not None:
+        paths.add("geometry.trap_y2_mm")
+    if frame.geometry.trap_z_mm is not None:
+        paths.add("geometry.trap_z_mm")
+    if frame.geometry.para_x_mm is not None:
+        paths.add("geometry.para_x_mm")
+    if frame.geometry.para_y_mm is not None:
+        paths.add("geometry.para_y_mm")
+    if frame.geometry.para_z_mm is not None:
+        paths.add("geometry.para_z_mm")
+    if frame.geometry.para_alpha_deg is not None:
+        paths.add("geometry.para_alpha_deg")
+    if frame.geometry.para_theta_deg is not None:
+        paths.add("geometry.para_theta_deg")
+    if frame.geometry.para_phi_deg is not None:
+        paths.add("geometry.para_phi_deg")
+    if frame.geometry.torus_major_radius_mm is not None:
+        paths.add("geometry.torus_major_radius_mm")
+    if frame.geometry.torus_minor_radius_mm is not None:
+        paths.add("geometry.torus_minor_radius_mm")
+    if frame.geometry.ellipsoid_ax_mm is not None:
+        paths.add("geometry.ellipsoid_ax_mm")
+    if frame.geometry.ellipsoid_by_mm is not None:
+        paths.add("geometry.ellipsoid_by_mm")
+    if frame.geometry.ellipsoid_cz_mm is not None:
+        paths.add("geometry.ellipsoid_cz_mm")
+    if frame.geometry.elltube_ax_mm is not None:
+        paths.add("geometry.elltube_ax_mm")
+    if frame.geometry.elltube_by_mm is not None:
+        paths.add("geometry.elltube_by_mm")
+    if frame.geometry.elltube_hz_mm is not None:
+        paths.add("geometry.elltube_hz_mm")
+    if frame.geometry.polyhedra_sides is not None:
+        paths.add("geometry.polyhedra_sides")
+    if frame.geometry.tilt_x_deg is not None:
+        paths.add("geometry.tilt_x_deg")
+    if frame.geometry.tilt_y_deg is not None:
+        paths.add("geometry.tilt_y_deg")
     if frame.materials.primary:
         paths.add("materials.primary")
     if frame.source.kind:
@@ -294,20 +416,182 @@ def _present_slot_paths(frame: SlotFrame) -> set[str]:
     return paths
 
 
+def _clear_geometry_slots(frame: SlotFrame) -> None:
+    frame.geometry.kind = None
+    frame.geometry.size_triplet_mm = None
+    frame.geometry.radius_mm = None
+    frame.geometry.half_length_mm = None
+    frame.geometry.radius1_mm = None
+    frame.geometry.radius2_mm = None
+    frame.geometry.x1_mm = None
+    frame.geometry.x2_mm = None
+    frame.geometry.y1_mm = None
+    frame.geometry.y2_mm = None
+    frame.geometry.z_mm = None
+    frame.geometry.z_planes_mm = None
+    frame.geometry.radii_mm = None
+    frame.geometry.trap_x1_mm = None
+    frame.geometry.trap_x2_mm = None
+    frame.geometry.trap_x3_mm = None
+    frame.geometry.trap_x4_mm = None
+    frame.geometry.trap_y1_mm = None
+    frame.geometry.trap_y2_mm = None
+    frame.geometry.trap_z_mm = None
+    frame.geometry.para_x_mm = None
+    frame.geometry.para_y_mm = None
+    frame.geometry.para_z_mm = None
+    frame.geometry.para_alpha_deg = None
+    frame.geometry.para_theta_deg = None
+    frame.geometry.para_phi_deg = None
+    frame.geometry.torus_major_radius_mm = None
+    frame.geometry.torus_minor_radius_mm = None
+    frame.geometry.ellipsoid_ax_mm = None
+    frame.geometry.ellipsoid_by_mm = None
+    frame.geometry.ellipsoid_cz_mm = None
+    frame.geometry.elltube_ax_mm = None
+    frame.geometry.elltube_by_mm = None
+    frame.geometry.elltube_hz_mm = None
+    frame.geometry.polyhedra_sides = None
+    frame.geometry.tilt_x_deg = None
+    frame.geometry.tilt_y_deg = None
+
+
+def _clear_target_slot(frame: SlotFrame, target: str) -> None:
+    if target == "geometry.kind":
+        _clear_geometry_slots(frame)
+        return
+    if target == "materials.primary":
+        frame.materials.primary = None
+        return
+    if target == "source.kind":
+        frame.source.kind = None
+        return
+    if target == "source.particle":
+        frame.source.particle = None
+        return
+    if target == "source.energy_mev":
+        frame.source.energy_mev = None
+        return
+    if target == "source.position_mm":
+        frame.source.position_mm = None
+        return
+    if target == "source.direction_vec":
+        frame.source.direction_vec = None
+        return
+    if target == "physics.explicit_list":
+        frame.physics.explicit_list = None
+        return
+    if target == "output.format":
+        frame.output.format = None
+        frame.output.path = None
+
+
+def _prune_unresolved_targets(frame: SlotFrame, user_text: str) -> list[str]:
+    unresolved_targets = infer_unresolved_targets(user_text)
+    uncertainty_signal = has_uncertainty_signal(user_text)
+    conservative_targets = {
+        "geometry.kind",
+        "materials.primary",
+        "source.kind",
+        "source.particle",
+        "source.energy_mev",
+        "source.position_mm",
+        "source.direction_vec",
+        "physics.explicit_list",
+        "output.format",
+    }
+    targets_to_check = set(unresolved_targets)
+    if uncertainty_signal:
+        targets_to_check.update(conservative_targets)
+    if not targets_to_check:
+        return []
+    frame.target_slots = sorted(set(frame.target_slots) | set(unresolved_targets))
+    cleared: list[str] = []
+    for target in sorted(targets_to_check):
+        if has_grounded_payload_for_target(user_text, target):
+            continue
+        _clear_target_slot(frame, target)
+        cleared.append(target)
+    if cleared and frame.intent == Intent.SET and uncertainty_signal:
+        frame.intent = Intent.QUESTION
+    return cleared
+
+
 def _normalize_inferred_slots(frame: SlotFrame) -> None:
     if frame.geometry.kind is None:
         if frame.geometry.size_triplet_mm:
             frame.geometry.kind = "box"
+        elif frame.geometry.radius1_mm is not None or frame.geometry.radius2_mm is not None:
+            frame.geometry.kind = "cons"
+        elif (
+            frame.geometry.x1_mm is not None
+            or frame.geometry.x2_mm is not None
+            or frame.geometry.y1_mm is not None
+            or frame.geometry.y2_mm is not None
+            or frame.geometry.z_mm is not None
+        ):
+            frame.geometry.kind = "trd"
+        elif frame.geometry.z_planes_mm or frame.geometry.radii_mm:
+            frame.geometry.kind = "polycone"
+        elif frame.geometry.polyhedra_sides is not None:
+            frame.geometry.kind = "polyhedra"
+        elif any(
+            value is not None
+            for value in (
+                frame.geometry.trap_x1_mm,
+                frame.geometry.trap_x2_mm,
+                frame.geometry.trap_x3_mm,
+                frame.geometry.trap_x4_mm,
+                frame.geometry.trap_y1_mm,
+                frame.geometry.trap_y2_mm,
+                frame.geometry.trap_z_mm,
+            )
+        ):
+            frame.geometry.kind = "trap"
+        elif any(
+            value is not None
+            for value in (
+                frame.geometry.para_x_mm,
+                frame.geometry.para_y_mm,
+                frame.geometry.para_z_mm,
+                frame.geometry.para_alpha_deg,
+                frame.geometry.para_theta_deg,
+                frame.geometry.para_phi_deg,
+            )
+        ):
+            frame.geometry.kind = "para"
+        elif frame.geometry.torus_major_radius_mm is not None or frame.geometry.torus_minor_radius_mm is not None:
+            frame.geometry.kind = "torus"
+        elif any(
+            value is not None
+            for value in (
+                frame.geometry.ellipsoid_ax_mm,
+                frame.geometry.ellipsoid_by_mm,
+                frame.geometry.ellipsoid_cz_mm,
+            )
+        ):
+            frame.geometry.kind = "ellipsoid"
+        elif any(
+            value is not None
+            for value in (
+                frame.geometry.elltube_ax_mm,
+                frame.geometry.elltube_by_mm,
+                frame.geometry.elltube_hz_mm,
+            )
+        ):
+            frame.geometry.kind = "elltube"
+        elif frame.geometry.tilt_x_deg is not None or frame.geometry.tilt_y_deg is not None:
+            frame.geometry.kind = "cuttubs"
         elif frame.geometry.radius_mm is not None or frame.geometry.half_length_mm is not None:
             frame.geometry.kind = "cylinder"
 
 
 def _geometry_box_from_phrase(text: str) -> list[float] | None:
-    low = text.lower().replace("??", "x")
+    low = text.lower().replace("\u8133", "x")
     m = re.search(
-        r"([-+]?\d*\.?\d+)\s*(mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)\s*(?:x|by)\s*"
-        r"([-+]?\d*\.?\d+)\s*(mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)\s*(?:x|by)\s*"
-        r"([-+]?\d*\.?\d+)\s*(mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)",
+        "([-+]?\\d*\\.?\\d+)\\s*(mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)\\s*(?:x|by)\\s*"
+        "([-+]?\\d*\\.?\\d+)\\s*(mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)\\s*(?:x|by)\\s*"
+        "([-+]?\\d*\\.?\\d+)\\s*(mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)",
         low,
     )
     if m:
@@ -319,9 +603,9 @@ def _geometry_box_from_phrase(text: str) -> list[float] | None:
 
     side_patterns = [
         r"(?:side(?:\s+length)?|edge(?:\s+length)?)\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
-        r"([-+]?\d*\.?\d+)\s*(mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)\s*\u89c1\u65b9",
-        r"\u8fb9\u957f\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(\u6beb\u7c73|\u5398\u7c73|\u7c73|mm|cm|m)",
-        r"([-+]?\d*\.?\d+)\s*(\u6beb\u7c73|\u5398\u7c73|\u7c73|mm|cm|m)\s*(?:\u7684)?(?:\u7acb\u65b9\u4f53|\u7acb\u65b9\u5757)",
+        "([-+]?\\d*\\.?\\d+)\\s*(mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)\\s*\u89c1\u65b9",
+        "\u8fb9\u957f\\s*[:=]?\\s*([-+]?\\d*\\.?\\d+)\\s*(\u6beb\u7c73|\u5398\u7c73|\u7c73|mm|cm|m)",
+        "([-+]?\\d*\\.?\\d+)\\s*(\u6beb\u7c73|\u5398\u7c73|\u7c73|mm|cm|m)\\s*(?:\u7684)?(?:\u7acb\u65b9\u4f53|\u7acb\u65b9\u5757)",
     ]
     for pattern in side_patterns:
         m = re.search(pattern, text, flags=re.IGNORECASE)
@@ -352,7 +636,6 @@ def _geometry_box_from_phrase(text: str) -> list[float] | None:
             return [side, side, side]
     return None
 
-
 def _geometry_cylinder_from_phrase(text: str) -> tuple[float | None, float | None]:
     low = text.lower()
 
@@ -370,7 +653,7 @@ def _geometry_cylinder_from_phrase(text: str) -> tuple[float | None, float | Non
     radius = _match_length(
         [
             r"radius\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
-            r"\u534a\u5f84\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(\u6beb\u7c73|\u5398\u7c73|\u7c73|mm|cm|m)",
+            "\u534a\u5f84\\s*[:=]?\\s*([-+]?\\d*\\.?\\d+)\\s*(\u6beb\u7c73|\u5398\u7c73|\u7c73|mm|cm|m)",
             r"r\s*[:=]\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
         ]
     )
@@ -378,7 +661,7 @@ def _geometry_cylinder_from_phrase(text: str) -> tuple[float | None, float | Non
         diameter = _match_length(
             [
                 r"diameter\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
-                r"\u76f4\u5f84\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(\u6beb\u7c73|\u5398\u7c73|\u7c73|mm|cm|m)",
+                "\u76f4\u5f84\\s*[:=]?\\s*([-+]?\\d*\\.?\\d+)\\s*(\u6beb\u7c73|\u5398\u7c73|\u7c73|mm|cm|m)",
             ]
         )
         if diameter is not None:
@@ -389,15 +672,15 @@ def _geometry_cylinder_from_phrase(text: str) -> tuple[float | None, float | Non
             r"half[-\s]*length\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
             r"half[-\s]*z\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
             r"hz\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
-            r"\u534a(?:\u957f|\u957f\u5ea6)\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(\u6beb\u7c73|\u5398\u7c73|\u7c73|mm|cm|m)",
+            "\u534a(?:\u957f|\u957f\u5ea6)\\s*[:=]?\\s*([-+]?\\d*\\.?\\d+)\\s*(\u6beb\u7c73|\u5398\u7c73|\u7c73|mm|cm|m)",
         ]
     )
     if half_length is None:
         half_length = _match_length(
             [
                 r"(?:height|length)\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
-                r"\u9ad8(?:\u5ea6)?\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(\u6beb\u7c73|\u5398\u7c73|\u7c73|mm|cm|m)",
-                r"\u957f(?:\u5ea6)?\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(\u6beb\u7c73|\u5398\u7c73|\u7c73|mm|cm|m)",
+                "\u9ad8(?:\u5ea6)?\\s*[:=]?\\s*([-+]?\\d*\\.?\\d+)\\s*(\u6beb\u7c73|\u5398\u7c73|\u7c73|mm|cm|m)",
+                "\u957f(?:\u5ea6)?\\s*[:=]?\\s*([-+]?\\d*\\.?\\d+)\\s*(\u6beb\u7c73|\u5398\u7c73|\u7c73|mm|cm|m)",
             ],
             halve=True,
         )
@@ -412,7 +695,6 @@ def _geometry_cylinder_from_phrase(text: str) -> tuple[float | None, float | Non
             half_length = half_length if half_length is not None else _to_mm(float(pair.group(3)), pair.group(4))
 
     return radius, half_length
-
 
 def _source_position_from_phrase(text: str) -> list[float] | None:
     patterns = [
@@ -470,12 +752,242 @@ def _apply_clause(frame: SlotFrame, key: str, raw_value: str) -> None:
         if frame.geometry.kind is None:
             frame.geometry.kind = "cylinder"
         return
+    if k in {"geometry.radius1", "geometry.radius1_mm", "geometry.rmax1"}:
+        radius1 = _coerce_length_mm(v)
+        if radius1 is not None:
+            frame.geometry.radius1_mm = radius1
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "cons"
+        return
+    if k in {"geometry.radius2", "geometry.radius2_mm", "geometry.rmax2"}:
+        radius2 = _coerce_length_mm(v)
+        if radius2 is not None:
+            frame.geometry.radius2_mm = radius2
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "cons"
+        return
     if k in {"geometry.half_length", "geometry.half_length_mm", "geometry.height", "geometry.height_mm", "geometry.hz"}:
         half_length = _coerce_length_mm(v)
         if half_length is not None:
             frame.geometry.half_length_mm = half_length
         if frame.geometry.kind is None:
             frame.geometry.kind = "cylinder"
+        return
+    if k in {"geometry.x1", "geometry.x1_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.x1_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "trd"
+        return
+    if k in {"geometry.x2", "geometry.x2_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.x2_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "trd"
+        return
+    if k in {"geometry.y1", "geometry.y1_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.y1_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "trd"
+        return
+    if k in {"geometry.y2", "geometry.y2_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.y2_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "trd"
+        return
+    if k in {"geometry.z", "geometry.z_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.z_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "trd"
+        return
+    if k in {"geometry.z_planes", "geometry.z_planes_mm"}:
+        vec = _coerce_vec3(v, metric=True)
+        if vec is not None:
+            frame.geometry.z_planes_mm = vec
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "polycone"
+        return
+    if k in {"geometry.radii", "geometry.radii_mm", "geometry.rmax_list"}:
+        vec = _coerce_vec3(v, metric=True)
+        if vec is not None:
+            frame.geometry.radii_mm = vec
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "polycone"
+        return
+    if k in {"geometry.polyhedra_sides", "geometry.polyhedra_nsides", "geometry.nsides"}:
+        value = _coerce_float(v)
+        if value is not None:
+            frame.geometry.polyhedra_sides = int(value)
+            frame.geometry.kind = "polyhedra"
+        return
+    if k in {"geometry.trap_x1", "geometry.trap_x1_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.trap_x1_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "trap"
+        return
+    if k in {"geometry.trap_x2", "geometry.trap_x2_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.trap_x2_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "trap"
+        return
+    if k in {"geometry.trap_x3", "geometry.trap_x3_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.trap_x3_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "trap"
+        return
+    if k in {"geometry.trap_x4", "geometry.trap_x4_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.trap_x4_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "trap"
+        return
+    if k in {"geometry.trap_y1", "geometry.trap_y1_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.trap_y1_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "trap"
+        return
+    if k in {"geometry.trap_y2", "geometry.trap_y2_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.trap_y2_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "trap"
+        return
+    if k in {"geometry.trap_z", "geometry.trap_z_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.trap_z_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "trap"
+        return
+    if k in {"geometry.para_x", "geometry.para_x_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.para_x_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "para"
+        return
+    if k in {"geometry.para_y", "geometry.para_y_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.para_y_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "para"
+        return
+    if k in {"geometry.para_z", "geometry.para_z_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.para_z_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "para"
+        return
+    if k in {"geometry.para_alpha", "geometry.para_alpha_deg"}:
+        value = _coerce_float(v)
+        if value is not None:
+            frame.geometry.para_alpha_deg = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "para"
+        return
+    if k in {"geometry.para_theta", "geometry.para_theta_deg"}:
+        value = _coerce_float(v)
+        if value is not None:
+            frame.geometry.para_theta_deg = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "para"
+        return
+    if k in {"geometry.para_phi", "geometry.para_phi_deg"}:
+        value = _coerce_float(v)
+        if value is not None:
+            frame.geometry.para_phi_deg = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "para"
+        return
+    if k in {"geometry.torus_major_radius", "geometry.torus_major_radius_mm", "geometry.torus_rtor"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.torus_major_radius_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "torus"
+        return
+    if k in {"geometry.torus_minor_radius", "geometry.torus_minor_radius_mm", "geometry.torus_rmax"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.torus_minor_radius_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "torus"
+        return
+    if k in {"geometry.ellipsoid_ax", "geometry.ellipsoid_ax_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.ellipsoid_ax_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "ellipsoid"
+        return
+    if k in {"geometry.ellipsoid_by", "geometry.ellipsoid_by_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.ellipsoid_by_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "ellipsoid"
+        return
+    if k in {"geometry.ellipsoid_cz", "geometry.ellipsoid_cz_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.ellipsoid_cz_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "ellipsoid"
+        return
+    if k in {"geometry.elltube_ax", "geometry.elltube_ax_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.elltube_ax_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "elltube"
+        return
+    if k in {"geometry.elltube_by", "geometry.elltube_by_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.elltube_by_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "elltube"
+        return
+    if k in {"geometry.elltube_hz", "geometry.elltube_hz_mm"}:
+        value = _coerce_length_mm(v)
+        if value is not None:
+            frame.geometry.elltube_hz_mm = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "elltube"
+        return
+    if k in {"geometry.tilt_x", "geometry.tilt_x_deg"}:
+        value = _coerce_float(v)
+        if value is not None:
+            frame.geometry.tilt_x_deg = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "cuttubs"
+        return
+    if k in {"geometry.tilt_y", "geometry.tilt_y_deg"}:
+        value = _coerce_float(v)
+        if value is not None:
+            frame.geometry.tilt_y_deg = value
+        if frame.geometry.kind is None:
+            frame.geometry.kind = "cuttubs"
         return
     if k in {"materials.primary", "materials.material", "materials.target", "materials.copper"}:
         mat = _canonical_material(v if k != "materials.copper" else "copper")
@@ -550,8 +1062,30 @@ def _backfill_from_user_text(frame: SlotFrame, user_text: str) -> None:
             frame.geometry.kind = "box"
         elif any(token in low for token in ("cylinder", "cylindrical", "tubs")) or "\u5706\u67f1" in text:
             frame.geometry.kind = "cylinder"
+        elif re.search(r"(?<![a-z0-9_])orb(?![a-z0-9_])", low):
+            frame.geometry.kind = "orb"
         elif "sphere" in low or "\u7403" in text:
             frame.geometry.kind = "sphere"
+        elif any(token in low for token in ("cons", "cone", "frustum")):
+            frame.geometry.kind = "cons"
+        elif any(token in low for token in ("trd", "trapezoid", "trapezoidal")):
+            frame.geometry.kind = "trd"
+        elif "trap" in low:
+            frame.geometry.kind = "trap"
+        elif any(token in low for token in ("para", "parallelepiped", "skewed box")):
+            frame.geometry.kind = "para"
+        elif any(token in low for token in ("torus", "donut", "ring tube")):
+            frame.geometry.kind = "torus"
+        elif "ellipsoid" in low:
+            frame.geometry.kind = "ellipsoid"
+        elif any(token in low for token in ("elltube", "elliptical tube", "ellipse tube", "elliptic tube")):
+            frame.geometry.kind = "elltube"
+        elif "polycone" in low:
+            frame.geometry.kind = "polycone"
+        elif any(token in low for token in ("polyhedra", "polyhedron")):
+            frame.geometry.kind = "polyhedra"
+        elif any(token in low for token in ("cuttubs", "cut tubs")):
+            frame.geometry.kind = "cuttubs"
 
     if frame.geometry.size_triplet_mm is None:
         triplet = _coerce_triplet_mm(text)
@@ -569,6 +1103,89 @@ def _backfill_from_user_text(frame: SlotFrame, user_text: str) -> None:
         if frame.geometry.half_length_mm is None and half_length is not None:
             frame.geometry.half_length_mm = half_length
             frame.geometry.kind = frame.geometry.kind or "cylinder"
+
+    if frame.geometry.radius1_mm is None:
+        m = re.search(r"(?:rmax1|radius1|top radius)\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)", low)
+        if m:
+            frame.geometry.radius1_mm = _to_mm(float(m.group(1)), m.group(2))
+            frame.geometry.kind = frame.geometry.kind or "cons"
+    if frame.geometry.radius2_mm is None:
+        m = re.search(r"(?:rmax2|radius2|bottom radius)\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)", low)
+        if m:
+            frame.geometry.radius2_mm = _to_mm(float(m.group(1)), m.group(2))
+            frame.geometry.kind = frame.geometry.kind or "cons"
+
+    trd_patterns = {
+        "x1_mm": r"x1\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "x2_mm": r"x2\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "y1_mm": r"y1\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "y2_mm": r"y2\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "z_mm": r"(?:z|depth)\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+    }
+    for field_name, pattern in trd_patterns.items():
+        if getattr(frame.geometry, field_name) is not None:
+            continue
+        m = re.search(pattern, low)
+        if not m:
+            continue
+        setattr(frame.geometry, field_name, _to_mm(float(m.group(1)), m.group(2)))
+        frame.geometry.kind = frame.geometry.kind or "trd"
+
+    named_patterns = {
+        "trap_x1_mm": r"trap[_\s-]*x1\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "trap_x2_mm": r"trap[_\s-]*x2\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "trap_x3_mm": r"trap[_\s-]*x3\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "trap_x4_mm": r"trap[_\s-]*x4\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "trap_y1_mm": r"trap[_\s-]*y1\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "trap_y2_mm": r"trap[_\s-]*y2\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "trap_z_mm": r"trap[_\s-]*z\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "para_x_mm": r"para[_\s-]*x\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "para_y_mm": r"para[_\s-]*y\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "para_z_mm": r"para[_\s-]*z\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "torus_major_radius_mm": r"(?:torus[_\s-]*)?(?:major radius|rtor)\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "torus_minor_radius_mm": r"(?:torus[_\s-]*)?(?:tube radius|minor radius|rmax)\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "ellipsoid_ax_mm": r"(?:ellipsoid[_\s-]*)?ax\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "ellipsoid_by_mm": r"(?:ellipsoid[_\s-]*)?by\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "ellipsoid_cz_mm": r"(?:ellipsoid[_\s-]*)?cz\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "elltube_ax_mm": r"(?:elltube|elliptical tube|ellipse tube|elliptic tube)[_\s-]*ax\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "elltube_by_mm": r"(?:elltube|elliptical tube|ellipse tube|elliptic tube)[_\s-]*by\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+        "elltube_hz_mm": r"(?:elltube|elliptical tube|ellipse tube|elliptic tube)[_\s-]*hz\s*[:=]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)",
+    }
+    for field_name, pattern in named_patterns.items():
+        if getattr(frame.geometry, field_name) is not None:
+            continue
+        m = re.search(pattern, low)
+        if not m:
+            continue
+        setattr(frame.geometry, field_name, _to_mm(float(m.group(1)), m.group(2)))
+
+    for field_name, pattern in {
+        "para_alpha_deg": r"para[_\s-]*alpha\s*[:=]?\s*([-+]?\d*\.?\d+)",
+        "para_theta_deg": r"para[_\s-]*theta\s*[:=]?\s*([-+]?\d*\.?\d+)",
+        "para_phi_deg": r"para[_\s-]*phi\s*[:=]?\s*([-+]?\d*\.?\d+)",
+    }.items():
+        if getattr(frame.geometry, field_name) is not None:
+            continue
+        m = re.search(pattern, low)
+        if m:
+            setattr(frame.geometry, field_name, float(m.group(1)))
+
+    if frame.geometry.polyhedra_sides is None:
+        m = re.search(r"(?:polyhedra|polyhedron)[_\s-]*(?:nsides|sides|n)\s*[:=]?\s*(\d+)", low)
+        if m:
+            frame.geometry.polyhedra_sides = int(m.group(1))
+            frame.geometry.kind = frame.geometry.kind or "polyhedra"
+
+    if frame.geometry.tilt_x_deg is None:
+        m = re.search(r"(?:tilt_x|tilt x)\s*[:=]?\s*([-+]?\d*\.?\d+)", low)
+        if m:
+            frame.geometry.tilt_x_deg = float(m.group(1))
+            frame.geometry.kind = frame.geometry.kind or "cuttubs"
+    if frame.geometry.tilt_y_deg is None:
+        m = re.search(r"(?:tilt_y|tilt y)\s*[:=]?\s*([-+]?\d*\.?\d+)", low)
+        if m:
+            frame.geometry.tilt_y_deg = float(m.group(1))
+            frame.geometry.kind = frame.geometry.kind or "cuttubs"
 
     if frame.materials.primary is None:
         for alias, canonical in _MATERIAL_ALIASES.items():
@@ -649,6 +1266,40 @@ def _coerce_slot_payload(payload: dict[str, Any]) -> tuple[SlotFrame, dict[str, 
         frame.geometry.size_triplet_mm = _coerce_triplet_mm(geometry.get("size_triplet_mm"))
         frame.geometry.radius_mm = _coerce_length_mm(geometry.get("radius_mm"))
         frame.geometry.half_length_mm = _coerce_length_mm(geometry.get("half_length_mm"))
+        frame.geometry.radius1_mm = _coerce_length_mm(geometry.get("radius1_mm"))
+        frame.geometry.radius2_mm = _coerce_length_mm(geometry.get("radius2_mm"))
+        frame.geometry.x1_mm = _coerce_length_mm(geometry.get("x1_mm"))
+        frame.geometry.x2_mm = _coerce_length_mm(geometry.get("x2_mm"))
+        frame.geometry.y1_mm = _coerce_length_mm(geometry.get("y1_mm"))
+        frame.geometry.y2_mm = _coerce_length_mm(geometry.get("y2_mm"))
+        frame.geometry.z_mm = _coerce_length_mm(geometry.get("z_mm"))
+        frame.geometry.z_planes_mm = _coerce_vec3(geometry.get("z_planes_mm"), metric=True)
+        frame.geometry.radii_mm = _coerce_vec3(geometry.get("radii_mm"), metric=True)
+        frame.geometry.trap_x1_mm = _coerce_length_mm(geometry.get("trap_x1_mm"))
+        frame.geometry.trap_x2_mm = _coerce_length_mm(geometry.get("trap_x2_mm"))
+        frame.geometry.trap_x3_mm = _coerce_length_mm(geometry.get("trap_x3_mm"))
+        frame.geometry.trap_x4_mm = _coerce_length_mm(geometry.get("trap_x4_mm"))
+        frame.geometry.trap_y1_mm = _coerce_length_mm(geometry.get("trap_y1_mm"))
+        frame.geometry.trap_y2_mm = _coerce_length_mm(geometry.get("trap_y2_mm"))
+        frame.geometry.trap_z_mm = _coerce_length_mm(geometry.get("trap_z_mm"))
+        frame.geometry.para_x_mm = _coerce_length_mm(geometry.get("para_x_mm"))
+        frame.geometry.para_y_mm = _coerce_length_mm(geometry.get("para_y_mm"))
+        frame.geometry.para_z_mm = _coerce_length_mm(geometry.get("para_z_mm"))
+        frame.geometry.para_alpha_deg = _coerce_float(geometry.get("para_alpha_deg"))
+        frame.geometry.para_theta_deg = _coerce_float(geometry.get("para_theta_deg"))
+        frame.geometry.para_phi_deg = _coerce_float(geometry.get("para_phi_deg"))
+        frame.geometry.torus_major_radius_mm = _coerce_length_mm(geometry.get("torus_major_radius_mm"))
+        frame.geometry.torus_minor_radius_mm = _coerce_length_mm(geometry.get("torus_minor_radius_mm"))
+        frame.geometry.ellipsoid_ax_mm = _coerce_length_mm(geometry.get("ellipsoid_ax_mm"))
+        frame.geometry.ellipsoid_by_mm = _coerce_length_mm(geometry.get("ellipsoid_by_mm"))
+        frame.geometry.ellipsoid_cz_mm = _coerce_length_mm(geometry.get("ellipsoid_cz_mm"))
+        frame.geometry.elltube_ax_mm = _coerce_length_mm(geometry.get("elltube_ax_mm"))
+        frame.geometry.elltube_by_mm = _coerce_length_mm(geometry.get("elltube_by_mm"))
+        frame.geometry.elltube_hz_mm = _coerce_length_mm(geometry.get("elltube_hz_mm"))
+        polyhedra_sides = _coerce_float(geometry.get("polyhedra_sides"))
+        frame.geometry.polyhedra_sides = int(polyhedra_sides) if polyhedra_sides is not None else None
+        frame.geometry.tilt_x_deg = _coerce_float(geometry.get("tilt_x_deg"))
+        frame.geometry.tilt_y_deg = _coerce_float(geometry.get("tilt_y_deg"))
         if frame.geometry.half_length_mm is None:
             frame.geometry.half_length_mm = _coerce_length_mm(geometry.get("height_mm"))
     elif "geometry" in slots:
@@ -725,6 +1376,9 @@ def build_llm_slot_frame(
         "content_after_payload": [],
         "content_after_refine": [],
         "repair_used": False,
+        "uncertainty_signal": has_uncertainty_signal(user_text),
+        "unresolved_targets": sorted(infer_unresolved_targets(user_text)),
+        "pruned_unresolved_targets": [],
     }
     try:
         resp = chat(prompt, config_path=config_path, temperature=0.0)
@@ -768,6 +1422,8 @@ def build_llm_slot_frame(
 
     raw_before = set(normalized_after)
     _backfill_from_user_text(frame, user_text)
+    _normalize_inferred_slots(frame)
+    stage_trace["pruned_unresolved_targets"] = _prune_unresolved_targets(frame, user_text)
     _normalize_inferred_slots(frame)
     raw_after = _present_slot_paths(frame)
     stage_trace["raw_text_backfill_fields"] = sorted(raw_after - raw_before)

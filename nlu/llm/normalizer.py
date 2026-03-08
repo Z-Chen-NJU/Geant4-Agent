@@ -6,6 +6,7 @@ from typing import Any
 from core.orchestrator.types import Intent
 from nlu.bert_lab.llm_bridge import build_normalization_prompt
 from nlu.bert_lab.ollama_client import chat, extract_json
+from nlu.uncertainty import has_uncertainty_signal, infer_unresolved_targets
 
 
 _TARGET_HINTS = {
@@ -18,6 +19,7 @@ _TARGET_HINTS = {
         "box",
         "cube",
         "sphere",
+        "orb",
         "cylinder",
         "cylindrical",
         "ring",
@@ -29,7 +31,31 @@ _TARGET_HINTS = {
         "\u73af",
         "\u9635\u5217",
     ],
-    "materials.selected_materials": ["material", "\u6750\u6599", "\u94dc", "\u94dd", "\u7845", "\u6c34", "copper", "aluminum", "silicon", "g4_"],
+    "materials.selected_materials": [
+        "material",
+        "materials",
+        "\u6750\u6599",
+        "\u94dc",
+        "\u94dd",
+        "\u7845",
+        "\u6c34",
+        "\u7a7a\u6c14",
+        "\u94c1",
+        "\u94c5",
+        "\u94a8",
+        "copper",
+        "aluminum",
+        "aluminium",
+        "silicon",
+        "water",
+        "air",
+        "iron",
+        "lead",
+        "steel",
+        "stainless",
+        "tungsten",
+        "g4_",
+    ],
     "source.type": ["source type", "point", "beam", "isotropic", "\u70b9\u6e90", "\u675f\u6d41"],
     "source.particle": ["gamma", "electron", "proton", "particle", "\u7c92\u5b50"],
     "source.energy": ["mev", "gev", "kev", "\u80fd\u91cf"],
@@ -43,6 +69,11 @@ _TARGET_HINTS = {
 _CONFIRM_PATTERNS = [
     r"^\s*(?:yes[, ]*)?(?:confirm|apply it|go ahead|approved?)\s*[.!?]?\s*$",
     r"^\s*(?:\u662f\u7684[,\uFF0C ]*)?(?:\u786e\u8ba4(?:\u4fee\u6539|\u8986\u76d6)?|\u597d\u7684[,\uFF0C ]*\u786e\u8ba4)\s*[\u3002\uFF01\uFF1F.!?]?\s*$",
+]
+_REJECT_PATTERNS = [
+    r"^\s*(?:no|nope)\s*[.!?]?\s*$",
+    r"^\s*(?:cancel|reject|keep (?:current|existing)|do not overwrite|don't overwrite|do not change|don't change)\s*[.!?]?\s*$",
+    r"^\s*(?:\u4e0d\u8981(?:\u6539|\u8986\u76d6)|\u4fdd\u6301(?:\u539f\u503c|\u539f\u6765|\u73b0\u6709)|\u4e0d\u6539\u4e86|\u53d6\u6d88(?:\u4fee\u6539|\u8986\u76d6)?)\s*[\u3002\uFF01\uFF1F.!?]?\s*$",
 ]
 _MODIFY_PATTERNS = [
     r"\b(?:change|switch|update|replace)\b",
@@ -92,6 +123,36 @@ _PAYLOAD_PATTERNS = [
     r"\u65b9\u5411",
     r"\u6750\u6599",
 ]
+_BOOLEAN_HINTS = (
+    "boolean",
+    "union",
+    "subtraction",
+    "intersection",
+    "subtract",
+    "intersect",
+    "minus",
+    "difference",
+    "hole",
+    "cut out",
+    "cutout",
+    "\u51cf\u53bb",
+    "\u5dee\u96c6",
+    "\u6316\u7a7a",
+    "\u5f00\u5b54",
+    "\u6253\u5b54",
+)
+
+_UNRESOLVED_SLOT_TO_TARGET_PATHS = {
+    "geometry.kind": {"geometry.structure"},
+    "materials.primary": {"materials.selected_materials"},
+    "source.kind": {"source.type"},
+    "source.particle": {"source.particle"},
+    "source.energy_mev": {"source.energy"},
+    "source.position_mm": {"source.position"},
+    "source.direction_vec": {"source.direction"},
+    "physics.explicit_list": {"physics.physics_list"},
+    "output.format": {"output.format"},
+}
 
 
 def _compact(text: str) -> str:
@@ -106,10 +167,14 @@ def _infer_intent(text: str) -> Intent:
     compact = _compact(text)
     if _matches_any(compact, _CONFIRM_PATTERNS):
         return Intent.CONFIRM
+    if _matches_any(compact, _REJECT_PATTERNS):
+        return Intent.REJECT
     if _matches_any(compact, _MODIFY_PATTERNS):
         return Intent.MODIFY
     if _matches_any(compact, _REMOVE_PATTERNS):
         return Intent.REMOVE
+    if has_uncertainty_signal(compact):
+        return Intent.QUESTION
 
     semantic_question = _matches_any(compact, _QUESTION_SEMANTIC_PATTERNS)
     punct_question = _matches_any(compact, _QUESTION_PUNCT_PATTERNS)
@@ -167,21 +232,111 @@ def _collect_target_paths(payload: str) -> list[str]:
             out.append("source.direction")
     if any(token in low for token in ["root tree", "root format", "root file"]):
         out.append("output.format")
+    if any(token in low for token in ["stack", "layer", "layers", "along z", "stackz"]):
+        out.extend(
+            [
+                "geometry.structure",
+                "geometry.graph_program",
+                "geometry.chosen_skeleton",
+                "geometry.params.stack_x",
+                "geometry.params.stack_y",
+                "geometry.params.t1",
+                "geometry.params.t2",
+                "geometry.params.t3",
+                "geometry.params.stack_clearance",
+                "geometry.params.nest_clearance",
+                "geometry.params.parent_x",
+                "geometry.params.parent_y",
+                "geometry.params.parent_z",
+            ]
+        )
+    if any(token in low for token in ["ring", "annulus", "circular array", "circular"]) and "spring" not in low:
+        out.extend(
+            [
+                "geometry.structure",
+                "geometry.graph_program",
+                "geometry.chosen_skeleton",
+                "geometry.params.n",
+                "geometry.params.radius",
+                "geometry.params.clearance",
+            ]
+        )
+    if any(token in low for token in ["grid", "array", "matrix", "pitch", "nx", "ny"]):
+        out.extend(
+            [
+                "geometry.structure",
+                "geometry.graph_program",
+                "geometry.chosen_skeleton",
+                "geometry.params.nx",
+                "geometry.params.ny",
+                "geometry.params.pitch_x",
+                "geometry.params.pitch_y",
+                "geometry.params.clearance",
+            ]
+        )
+    if any(token in low for token in ["nest", "inside", "contains", "contain", "inner", "outer"]):
+        out.extend(
+            [
+                "geometry.structure",
+                "geometry.graph_program",
+                "geometry.chosen_skeleton",
+                "geometry.params.parent_x",
+                "geometry.params.parent_y",
+                "geometry.params.parent_z",
+                "geometry.params.child_rmax",
+                "geometry.params.child_hz",
+                "geometry.params.clearance",
+            ]
+        )
+    if any(token in low for token in ["shell", "concentric", "coaxial"]):
+        out.extend(
+            [
+                "geometry.structure",
+                "geometry.graph_program",
+                "geometry.chosen_skeleton",
+                "geometry.params.inner_r",
+                "geometry.params.hz",
+                "geometry.params.th1",
+                "geometry.params.th2",
+                "geometry.params.th3",
+                "geometry.params.child_rmax",
+                "geometry.params.child_hz",
+                "geometry.params.clearance",
+            ]
+        )
+    if any(token in low for token in _BOOLEAN_HINTS):
+        out.extend(
+            [
+                "geometry.structure",
+                "geometry.graph_program",
+                "geometry.chosen_skeleton",
+                "geometry.params.bool_a_x",
+                "geometry.params.bool_a_y",
+                "geometry.params.bool_a_z",
+                "geometry.params.bool_b_x",
+                "geometry.params.bool_b_y",
+                "geometry.params.bool_b_z",
+            ]
+        )
     return sorted(set(out))
 
 
 def _infer_target_paths(text: str, normalized_text: str = "") -> list[str]:
     out = _collect_target_paths(text)
+    unresolved = infer_unresolved_targets(text)
+    if unresolved:
+        for slot_target in unresolved:
+            out.extend(_UNRESOLVED_SLOT_TO_TARGET_PATHS.get(slot_target, set()))
     if out:
-        return out
+        return sorted(set(out))
     if normalized_text:
-        return _collect_target_paths(normalized_text)
+        return sorted(set(_collect_target_paths(normalized_text)))
     return []
 
 
 def infer_user_turn_controls(user_text: str) -> dict[str, Any]:
     intent = _infer_intent(user_text)
-    if intent == Intent.CONFIRM:
+    if intent in {Intent.CONFIRM, Intent.REJECT}:
         target_paths: list[str] = []
     else:
         target_paths = _infer_target_paths(user_text)

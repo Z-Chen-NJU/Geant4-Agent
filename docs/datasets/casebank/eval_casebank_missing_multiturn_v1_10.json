@@ -1,0 +1,228 @@
+{
+  "schema_version": "v1",
+  "dataset_name": "missing_multiturn_casebank_10",
+  "description": "Missing-parameter multi-turn regression set for clarification and closure checks.",
+  "cases": [
+    {
+      "id": "MTM01",
+      "domain": "medical",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "???????????????????????????????",
+      "followup_turns": [
+        "? 300 mm x 300 mm x 300 mm ?????? G4_WATER?source.type=beam?particle=gamma?energy=6 MeV?position=(0,0,-400) mm?direction=+z?physics=QBBC?output=root?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_WATER",
+        "source.type": "beam",
+        "source.particle": "gamma",
+        "output.format": "root"
+      }
+    },
+    {
+      "id": "MTM02",
+      "domain": "aerospace",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "en",
+      "prompt": "I need a first-pass proton irradiation setup for a silicon device; keep it simple for now.",
+      "followup_turns": [
+        "Use a silicon box 50 mm x 50 mm x 5 mm, beam source proton 100 MeV from (0,0,-100) mm along +z, physics FTFP_BERT, output json."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Si",
+        "source.particle": "proton",
+        "output.format": "json"
+      }
+    },
+    {
+      "id": "MTM03",
+      "domain": "industrial_ndt",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "????????????????? gamma ??????????",
+      "followup_turns": [
+        "???? 40 mm??? 80 mm??? G4_Fe?source.type=point?particle=gamma?energy=2 MeV?position=(0,0,-200) mm?direction=+z?physics=Shielding?output=csv?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_Fe",
+        "source.type": "point",
+        "output.format": "csv"
+      }
+    },
+    {
+      "id": "MTM04",
+      "domain": "physics",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "en",
+      "prompt": "Gamma point source 1 MeV at (0,0,-100) toward +z; please build the rest.",
+      "followup_turns": [
+        "Set copper box 1 m x 1 m x 1 m, physics FTFP_BERT, output hdf5."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Cu",
+        "source.type": "point",
+        "output.format": "hdf5"
+      }
+    },
+    {
+      "id": "MTM05",
+      "domain": "nuclear_engineering",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "?????????????????????????",
+      "followup_turns": [
+        "? 200 mm x 200 mm x 200 mm ?????? G4_Pb?source.type=point?particle=neutron?energy=14 MeV?position=(0,0,-50) mm?direction=+z?physics=QGSP_BERT_HP?output=xml?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Pb",
+        "source.particle": "neutron",
+        "output.format": "xml"
+      }
+    },
+    {
+      "id": "MTM06",
+      "domain": "security_screening",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "prompt": "Need a quick cargo-screening toy setup with forward photons; details can follow.",
+      "followup_turns": [
+        "Use steel cylinder target radius 60 mm half-length 120 mm, beam gamma 3 MeV from (0,0,-500) mm to +z, physics Shielding, output root."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "source.type": "beam",
+        "source.particle": "gamma",
+        "output.format": "root"
+      }
+    },
+    {
+      "id": "MTM07",
+      "domain": "semiconductor",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "??????????????????????????",
+      "followup_turns": [
+        "?? 20 mm x 20 mm x 1 mm ?????? G4_Si?source.type=isotropic?particle=neutron?energy=2 MeV?position=(0,0,0) mm?physics=QGSP_BERT_HP?output=json?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Si",
+        "source.type": "isotropic",
+        "output.format": "json"
+      }
+    },
+    {
+      "id": "MTM08",
+      "domain": "education",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "prompt": "For classroom demo, I want gamma attenuation in copper; you can ask only essential missing parts.",
+      "followup_turns": [
+        "Okay, copper box 100 mm x 100 mm x 100 mm, point gamma 1 MeV at (0,0,-200) mm, direction +z, physics FTFP_BERT, output csv."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Cu",
+        "source.type": "point",
+        "output.format": "csv"
+      }
+    },
+    {
+      "id": "MTM09",
+      "domain": "environmental_radiation",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "??????????????????????????????",
+      "followup_turns": [
+        "? 500 mm x 500 mm x 500 mm ??????? G4_AIR?source.type=point?particle=gamma?energy=0.5 MeV?position=(0,0,-300) mm?direction=+z?physics=QBBC?output=root?"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_AIR",
+        "source.particle": "gamma",
+        "output.format": "root"
+      }
+    },
+    {
+      "id": "MTM10",
+      "domain": "high_energy_physics",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "en",
+      "prompt": "Set geometry as a sphere target; I have not decided radius or source details yet.",
+      "followup_turns": [
+        "Sphere target radius 80 mm, lead material, electron point source 5 MeV at (0,0,-200) mm toward +z, physics FTFP_BERT, output hdf5."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_Pb",
+        "source.particle": "e-",
+        "output.format": "hdf5"
+      }
+    }
+  ]
+}

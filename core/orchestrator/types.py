@@ -19,6 +19,7 @@ class Intent(str, Enum):
     MODIFY = "MODIFY"
     REMOVE = "REMOVE"
     CONFIRM = "CONFIRM"
+    REJECT = "REJECT"
     QUESTION = "QUESTION"
     OTHER = "OTHER"
 
@@ -104,3 +105,4 @@ class SessionState:
     confirmed_fact_paths: list[str] = field(default_factory=list)
     dialogue_memory: list[dict[str, Any]] = field(default_factory=list)
     pending_overwrite: list[dict[str, Any]] = field(default_factory=list)
+    semantic_missing_paths: list[str] = field(default_factory=list)

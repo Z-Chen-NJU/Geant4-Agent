@@ -111,8 +111,85 @@ def _apply_updates(config: dict, updates: list) -> None:
         set_path(config, upd.path, upd.value)
 
 
+def _dedupe_paths(paths: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for path in paths:
+        item = str(path or "").strip()
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
+_GRAPH_STRUCTURES = {"ring", "grid", "nest", "stack", "shell", "boolean"}
+
+
+def _candidate_structure(candidate: CandidateUpdate | None) -> str | None:
+    if candidate is None:
+        return None
+    for update in candidate.updates:
+        if update.path == "geometry.structure" and isinstance(update.value, str):
+            return update.value
+    return None
+
+
+def _strip_geometry_updates(candidate: CandidateUpdate | None) -> CandidateUpdate | None:
+    if candidate is None or not candidate.updates:
+        return candidate
+    filtered = [update for update in candidate.updates if not update.path.startswith("geometry.")]
+    if len(filtered) == len(candidate.updates):
+        return candidate
+    return CandidateUpdate(
+        producer=candidate.producer,
+        intent=candidate.intent,
+        target_paths=[path for path in candidate.target_paths if not str(path).startswith("geometry.")],
+        updates=filtered,
+        confidence=candidate.confidence,
+        rationale=f"{candidate.rationale}_geometry_stripped",
+    )
+
+
+def _augment_geometry_targets(
+    user_candidate: CandidateUpdate | None,
+    extracted_candidate: CandidateUpdate | None,
+) -> CandidateUpdate | None:
+    if user_candidate is None or extracted_candidate is None:
+        return user_candidate
+    existing_targets = [
+        str(path)
+        for path in user_candidate.target_paths
+        if isinstance(path, str) and path
+    ]
+    if existing_targets and not any(path == "geometry" or path.startswith("geometry.") for path in existing_targets):
+        return user_candidate
+    geometry_targets = [update.path for update in extracted_candidate.updates if update.path.startswith("geometry.")]
+    if not geometry_targets:
+        return user_candidate
+    merged_targets = _dedupe_paths(list(user_candidate.target_paths) + geometry_targets)
+    if merged_targets == user_candidate.target_paths:
+        return user_candidate
+    return CandidateUpdate(
+        producer=user_candidate.producer,
+        intent=user_candidate.intent,
+        target_paths=merged_targets,
+        updates=list(user_candidate.updates),
+        confidence=user_candidate.confidence,
+        rationale=f"{user_candidate.rationale}_graph_targets_augmented",
+    )
+
+
+_EXPLICIT_TARGET_DEPENDENCIES = {
+    "geometry.structure": {"geometry.chosen_skeleton", "geometry.graph_program", "geometry.root_name"},
+}
+
+
 def _path_explicitly_requested(user_candidate: CandidateUpdate, path: str) -> bool:
-    for target in user_candidate.target_paths:
+    expanded_targets = {str(target) for target in user_candidate.target_paths if isinstance(target, str) and target}
+    for target in list(expanded_targets):
+        expanded_targets.update(_EXPLICIT_TARGET_DEPENDENCIES.get(target, set()))
+    for target in expanded_targets:
         if path == target:
             return True
         if path.startswith(target + "."):
@@ -141,7 +218,7 @@ def _apply_explicit_user_controls(
         if isinstance(path, str) and path
     ]
     intent = user_candidate.intent
-    if explicit_intent in {Intent.CONFIRM, Intent.MODIFY, Intent.REMOVE, Intent.QUESTION}:
+    if explicit_intent in {Intent.CONFIRM, Intent.REJECT, Intent.MODIFY, Intent.REMOVE, Intent.QUESTION}:
         intent = explicit_intent
     elif (
         explicit_intent == Intent.SET
@@ -303,6 +380,65 @@ def _merge_pending_overwrites(
     return list(merged.values())
 
 
+def _has_pending_overwrite_path(items: list[dict[str, Any]], path: str) -> bool:
+    target = str(path).strip()
+    if not target:
+        return False
+    for item in items:
+        if str(item.get("path", "")).strip() == target:
+            return True
+    return False
+
+
+def _stage_dependent_geometry_updates_for_pending(
+    draft: Any,
+    candidates: list[CandidateUpdate],
+    staged_pending_overwrite: list[dict[str, Any]],
+    *,
+    lang: str,
+) -> tuple[list[CandidateUpdate], list[dict[str, Any]]]:
+    # When structure overwrite is pending confirmation, geometry params from
+    # the same turn must be committed atomically with structure after confirm.
+    if not _has_pending_overwrite_path(staged_pending_overwrite, "geometry.structure"):
+        return candidates, staged_pending_overwrite
+
+    dependency_items: list[dict[str, Any]] = []
+    filtered_candidates: list[CandidateUpdate] = []
+    for candidate in candidates:
+        kept: list[UpdateOp] = []
+        for update in candidate.updates:
+            if update.path.startswith("geometry.params."):
+                dependency_items.append(
+                    _pending_item_from_update(
+                        update,
+                        draft=draft,
+                        lang=lang,
+                        producer=candidate.producer.value,
+                    )
+                )
+                continue
+            kept.append(update)
+        if not kept:
+            continue
+        if len(kept) == len(candidate.updates):
+            filtered_candidates.append(candidate)
+            continue
+        filtered_candidates.append(
+            CandidateUpdate(
+                producer=candidate.producer,
+                intent=candidate.intent,
+                target_paths=sorted({u.path for u in kept}),
+                updates=kept,
+                confidence=candidate.confidence,
+                rationale=f"{candidate.rationale}_geometry_deferred",
+            )
+        )
+
+    if dependency_items:
+        staged_pending_overwrite = _merge_pending_overwrites(staged_pending_overwrite, dependency_items)
+    return filtered_candidates, staged_pending_overwrite
+
+
 def _pending_item_from_update(
     update: UpdateOp,
     *,
@@ -392,12 +528,36 @@ def _build_forced_explicit_candidate(
         confidence=1.0,
         rationale="forced_explicit_text_choice",
     )
+
+
+def _has_geometry_signal(*, debug: dict[str, Any], committed_updates: list[UpdateOp], user_candidate: CandidateUpdate) -> bool:
+    graph_choice = debug.get("graph_choice", {}) if isinstance(debug, dict) else {}
+    chosen_skeleton = str(graph_choice.get("chosen_skeleton", "") or "").strip()
+    structure = str(graph_choice.get("structure", "") or "").strip()
+    if chosen_skeleton:
+        return True
+    if structure and structure != "unknown":
+        return True
+    if any(update.path.startswith("geometry.") for update in committed_updates):
+        return True
+    return any(str(path).startswith("geometry.") for path in user_candidate.target_paths)
+
+
+def _semantic_missing_from_debug(debug: dict[str, Any]) -> list[str]:
+    if not isinstance(debug, dict):
+        return []
+    graph_choice = debug.get("graph_choice", {})
+    if not isinstance(graph_choice, dict):
+        return []
+    return _dedupe_paths(list(graph_choice.get("dialogue_missing_paths", []) or []))
 def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: float = 0.6, lang: str = "zh") -> dict:
     text = str(payload.get("text", "")).strip()
     if not text:
         return {"error": "missing text"}
     state = get_or_create_session(payload.get("session_id"))
-    previous_missing_paths = validate_layer_c_completeness(state.config).missing_required_paths
+    previous_missing_paths = _dedupe_paths(
+        validate_layer_c_completeness(state.config).missing_required_paths + list(state.semantic_missing_paths)
+    )
     state.turn_id += 1
     state.history.append({"role": "user", "content": text})
 
@@ -409,6 +569,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
     internal_temperature = 0.0
     user_temperature = float(payload.get("user_temperature", 1.0))
     normalize_input = bool(payload.get("normalize_input", True))
+    apply_autofix = bool(payload.get("autofix", False))
     enable_llm_first = bool(llm_router and normalize_input)
     llm_used = False
     fallback_reason = E_LLM_ROUTER_DISABLED if (not llm_router and normalize_input) else "E_LLM_DISABLED"
@@ -417,11 +578,14 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
     llm_stage_failures: list[str] = []
     slot_debug: dict[str, Any] = {}
     debug: dict[str, Any] = {"graph_candidates": []}
+    semantic_missing_paths = list(state.semantic_missing_paths)
     normalized_text = text
     content_candidates: list[CandidateUpdate] = []
     user_candidate: CandidateUpdate | None = None
     applying_pending_overwrite = False
+    confirm_apply_failed = False
     staged_pending_overwrite: list[dict[str, Any]] = []
+    rejected_overwrite_preview: list[dict[str, Any]] = []
     explicit_controls = infer_user_turn_controls(text)
 
     if enable_llm_first:
@@ -443,7 +607,13 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
                 min_confidence=min_confidence,
                 context_summary=context_summary,
                 config_path=ollama_config_path,
+                apply_autofix=apply_autofix,
             )
+            slot_structure = _candidate_structure(slot_candidate)
+            extracted_structure = _candidate_structure(extracted_candidate)
+            if extracted_structure in _GRAPH_STRUCTURES and slot_structure not in _GRAPH_STRUCTURES:
+                user_candidate = _augment_geometry_targets(user_candidate, extracted_candidate)
+                slot_candidate = _strip_geometry_updates(slot_candidate)
             if slot_candidate is not None:
                 slot_candidate = filter_candidate_by_explicit_targets(slot_candidate, list(user_candidate.target_paths))
             if user_candidate.target_paths:
@@ -483,6 +653,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
                     min_confidence=min_confidence,
                     context_summary=context_summary,
                     config_path=ollama_config_path,
+                    apply_autofix=apply_autofix,
                 )
                 semantic_candidate = filter_candidate_by_explicit_targets(
                     semantic_result.candidate,
@@ -536,6 +707,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
             min_confidence=min_confidence,
             context_summary=context_summary,
             config_path=ollama_config_path,
+            apply_autofix=apply_autofix,
         )
         normalized_text = norm["normalized_text"]
         content_candidates = [
@@ -553,7 +725,8 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
 
     if state.pending_overwrite:
         if user_candidate.intent == Intent.CONFIRM:
-            confirmed_candidate = _candidate_from_pending_overwrite(state.pending_overwrite, turn_id=state.turn_id)
+            staged_pending_overwrite = list(state.pending_overwrite)
+            confirmed_candidate = _candidate_from_pending_overwrite(staged_pending_overwrite, turn_id=state.turn_id)
             content_candidates = [confirmed_candidate]
             user_candidate = confirmed_candidate
             applying_pending_overwrite = True
@@ -562,6 +735,16 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
                 "intent": Intent.CONFIRM.value,
                 "confidence": 1.0,
                 "backend": "pending_overwrite_confirmation",
+            }
+        elif user_candidate.intent == Intent.REJECT:
+            rejected_overwrite_preview = list(state.pending_overwrite)
+            staged_pending_overwrite = []
+            content_candidates = []
+            debug["inference_backend"] = f"{debug.get('inference_backend', 'orchestrated')}+rejected_pending_overwrite"
+            normalization_payload = {
+                "intent": Intent.REJECT.value,
+                "confidence": 1.0,
+                "backend": "pending_overwrite_rejection",
             }
         else:
             staged_pending_overwrite = list(state.pending_overwrite)
@@ -572,15 +755,17 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
             for candidate in content_candidates
         ]
 
+    suppress_content_generation = bool(rejected_overwrite_preview and user_candidate.intent == Intent.REJECT)
     candidates: list[CandidateUpdate] = list(content_candidates)
-    forced_explicit = _build_forced_explicit_candidate(
-        text=text,
-        normalized_text=normalized_text,
-        user_candidate=user_candidate,
-        turn_id=state.turn_id,
-    )
-    if forced_explicit is not None:
-        candidates.append(forced_explicit)
+    if not suppress_content_generation:
+        forced_explicit = _build_forced_explicit_candidate(
+            text=text,
+            normalized_text=normalized_text,
+            user_candidate=user_candidate,
+            turn_id=state.turn_id,
+        )
+        if forced_explicit is not None:
+            candidates.append(forced_explicit)
 
     merged_user_text = f"{text} ; {normalized_text}"
     has_explicit_physics = _has_explicit_physics_choice(merged_user_text, KNOWLEDGE["physics_lists"])
@@ -593,7 +778,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         turn_id=state.turn_id,
         config_path=ollama_config_path,
     )
-    if allow_recommender and reco_candidate is not None:
+    if not suppress_content_generation and allow_recommender and reco_candidate is not None:
         candidates.append(reco_candidate)
 
     pending_conflict_rejected: list[dict[str, Any]] = []
@@ -642,6 +827,12 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         )
         if new_pending_overwrite:
             staged_pending_overwrite = _merge_pending_overwrites(staged_pending_overwrite, new_pending_overwrite)
+        candidates, staged_pending_overwrite = _stage_dependent_geometry_updates_for_pending(
+            draft,
+            candidates,
+            staged_pending_overwrite,
+            lang=lang,
+        )
     accepted_updates, rejected_updates, applied_rules = arbitrate_candidates(draft, candidates)
     rejected_updates = pending_conflict_rejected + policy_rejected + rejected_updates
     if staged_pending_overwrite and not applying_pending_overwrite:
@@ -662,6 +853,8 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
 
     if hard_errors:
         # rollback
+        if applying_pending_overwrite and staged_pending_overwrite:
+            confirm_apply_failed = True
         rejected_updates.extend(
             {
                 "path": upd.path,
@@ -675,6 +868,8 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         committed_updates = []
         working = deep_copy(draft.config)
         report = validate_all(working)
+        if confirm_apply_failed:
+            applied_rules = [{"rule": "pending_overwrite_confirm_failed_rollback", "count": len(staged_pending_overwrite)}] + applied_rules
     else:
         draft.config = working
         for upd in committed_updates:
@@ -685,7 +880,18 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
     phase_config = working if not hard_errors else state.config
     draft.phase = decide_phase_transition(draft.phase, report, report, config=phase_config)
     final_report = validate_layer_c_completeness(draft.config if not hard_errors else state.config)
-    is_complete = final_report.ok
+    if rejected_overwrite_preview:
+        semantic_missing_paths = []
+    elif not hard_errors and _has_geometry_signal(
+        debug=debug,
+        committed_updates=committed_updates,
+        user_candidate=user_candidate,
+    ):
+        semantic_missing_paths = _semantic_missing_from_debug(debug)
+    final_missing_paths = _dedupe_paths(final_report.missing_required_paths + list(semantic_missing_paths))
+    pending_overwrite_required = bool(staged_pending_overwrite and (not applying_pending_overwrite or confirm_apply_failed))
+    is_complete = bool(final_report.ok and not final_missing_paths and not pending_overwrite_required and not confirm_apply_failed)
+    dialogue_pending_preview = list(staged_pending_overwrite) if pending_overwrite_required else []
     if is_complete:
         # lock subtree on complete
         # exact locks are already maintained by constraint ledger.
@@ -693,10 +899,15 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
 
     if not hard_errors:
         commit_turn(state, draft)
+        state.semantic_missing_paths = list(semantic_missing_paths)
         if applying_pending_overwrite:
+            state.pending_overwrite = []
+        elif rejected_overwrite_preview:
             state.pending_overwrite = []
         elif staged_pending_overwrite:
             state.pending_overwrite = staged_pending_overwrite
+        else:
+            state.pending_overwrite = []
     elif staged_pending_overwrite:
         state.pending_overwrite = staged_pending_overwrite
 
@@ -712,11 +923,11 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
 
     state.open_questions, answered_this_turn = advance_question_state(
         previous_missing_paths=previous_missing_paths,
-        current_missing_paths=final_report.missing_required_paths,
+        current_missing_paths=final_missing_paths,
         open_questions=state.open_questions,
     )
     asked_fields = plan_questions(
-        final_report.missing_required_paths,
+        final_missing_paths,
         state.phase,
         open_questions=state.open_questions,
         last_asked_paths=state.last_asked_paths,
@@ -724,14 +935,14 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
     )
     if asked_fields:
         for path in asked_fields:
-            if path in final_report.missing_required_paths and path not in state.open_questions:
+            if path in final_missing_paths and path not in state.open_questions:
                 state.open_questions.append(path)
     else:
         state.open_questions = []
     state.last_asked_paths = list(asked_fields)
     state.question_attempts = update_question_attempts(
         previous_attempts=state.question_attempts,
-        current_missing_paths=final_report.missing_required_paths,
+        current_missing_paths=final_missing_paths,
         answered_paths=answered_this_turn,
         asked_paths=asked_fields,
     )
@@ -742,10 +953,11 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         user_intent=dialogue_user_intent,
         is_complete=is_complete,
         asked_fields=asked_fields,
-        missing_fields=final_report.missing_required_paths,
+        missing_fields=final_missing_paths,
         updated_paths=updated_paths,
         answered_this_turn=answered_this_turn,
-        pending_overwrite_preview=staged_pending_overwrite,
+        pending_overwrite_preview=dialogue_pending_preview,
+        rejected_overwrite_preview=rejected_overwrite_preview,
         available_explanations=available_explanations,
         last_dialogue_action=state.last_dialogue_action,
     )
@@ -794,7 +1006,10 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         },
         "validation": {
             "is_complete": is_complete,
-            "missing_fields": list(final_report.missing_required_paths),
+            "pending_overwrite_required": pending_overwrite_required,
+            "missing_fields": list(final_missing_paths),
+            "schema_missing_fields": list(final_report.missing_required_paths),
+            "semantic_missing_fields": list(semantic_missing_paths),
             "violations": list(report.errors),
             "warnings": list(report.warnings),
         },
@@ -818,8 +1033,9 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         "dialogue_memory": dialogue_memory,
         "raw_dialogue": raw_dialogue,
         "is_complete": is_complete,
+        "pending_overwrite_required": pending_overwrite_required,
         "assistant_message": question,
-        "missing_fields": final_report.missing_required_paths,
+        "missing_fields": final_missing_paths,
         "answered_this_turn": answered_this_turn,
         "asked_fields": asked_fields,
         "asked_fields_friendly": asked_fields_friendly,
@@ -845,6 +1061,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         "violations": report.errors,
         "warnings": report.warnings,
         "graph_candidates": debug.get("graph_candidates", []),
+        "graph_choice": debug.get("graph_choice", {}),
         "inference_backend": debug.get("inference_backend", "orchestrated"),
         "internal_trace": internal_trace,
         "history": state.history[-10:],

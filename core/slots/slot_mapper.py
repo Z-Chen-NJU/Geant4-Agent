@@ -1,24 +1,11 @@
 from __future__ import annotations
 
+from core.geometry.family_catalog import GEOMETRY_KIND_TO_STRUCTURE, GEOMETRY_SLOT_TARGET_TO_PATHS
 from core.orchestrator.types import CandidateUpdate, Intent, Producer, UpdateOp
 from core.slots.slot_frame import SlotFrame
 
-
-_GEOMETRY_KIND_TO_STRUCTURE = {
-    "box": "single_box",
-    "cylinder": "single_tubs",
-    "sphere": "single_sphere",
-}
-
 _SLOT_TARGET_TO_PATHS = {
-    "geometry.kind": {"geometry.structure", "geometry.root_name"},
-    "geometry.size_triplet_mm": {
-        "geometry.params.module_x",
-        "geometry.params.module_y",
-        "geometry.params.module_z",
-    },
-    "geometry.radius_mm": {"geometry.params.child_rmax"},
-    "geometry.half_length_mm": {"geometry.params.child_hz"},
+    **GEOMETRY_SLOT_TARGET_TO_PATHS,
     "materials.primary": {"materials.selected_materials", "materials.volume_material_map"},
     "source.kind": {"source.type"},
     "source.particle": {"source.particle"},
@@ -31,6 +18,18 @@ _SLOT_TARGET_TO_PATHS = {
     "output.path": {"output.path"},
 }
 
+_MATERIAL_CANONICAL_OVERRIDES = {
+    "g4_csi": "G4_CESIUM_IODIDE",
+    "csi": "G4_CESIUM_IODIDE",
+    "cesium iodide": "G4_CESIUM_IODIDE",
+    "caesium iodide": "G4_CESIUM_IODIDE",
+}
+
+
+def _canonical_material_name(value: str) -> str:
+    text = str(value or "").strip()
+    return _MATERIAL_CANONICAL_OVERRIDES.get(text.lower(), text)
+
 
 def _vector3(value: list[float]) -> dict[str, object]:
     return {"type": "vector", "value": [float(value[0]), float(value[1]), float(value[2])]}
@@ -41,7 +40,7 @@ def slot_frame_to_candidates(frame: SlotFrame, *, turn_id: int) -> tuple[Candida
     target_paths: list[str] = []
 
     if frame.geometry.kind:
-        structure = _GEOMETRY_KIND_TO_STRUCTURE.get(frame.geometry.kind)
+        structure = GEOMETRY_KIND_TO_STRUCTURE.get(frame.geometry.kind)
         if structure:
             updates.append(
                 UpdateOp(
@@ -96,12 +95,208 @@ def slot_frame_to_candidates(frame: SlotFrame, *, turn_id: int) -> tuple[Candida
         )
         target_paths.append("geometry.params.child_hz")
 
+    if frame.geometry.radius1_mm is not None:
+        updates.append(
+            UpdateOp(
+                path="geometry.params.rmax1",
+                op="set",
+                value=float(frame.geometry.radius1_mm),
+                producer=Producer.SLOT_MAPPER,
+                confidence=frame.confidence or 0.8,
+                turn_id=turn_id,
+            )
+        )
+        target_paths.append("geometry.params.rmax1")
+
+    if frame.geometry.radius2_mm is not None:
+        updates.append(
+            UpdateOp(
+                path="geometry.params.rmax2",
+                op="set",
+                value=float(frame.geometry.radius2_mm),
+                producer=Producer.SLOT_MAPPER,
+                confidence=frame.confidence or 0.8,
+                turn_id=turn_id,
+            )
+        )
+        target_paths.append("geometry.params.rmax2")
+
+    if frame.geometry.x1_mm is not None:
+        updates.append(
+            UpdateOp(
+                path="geometry.params.x1",
+                op="set",
+                value=float(frame.geometry.x1_mm),
+                producer=Producer.SLOT_MAPPER,
+                confidence=frame.confidence or 0.8,
+                turn_id=turn_id,
+            )
+        )
+        target_paths.append("geometry.params.x1")
+
+    if frame.geometry.x2_mm is not None:
+        updates.append(
+            UpdateOp(
+                path="geometry.params.x2",
+                op="set",
+                value=float(frame.geometry.x2_mm),
+                producer=Producer.SLOT_MAPPER,
+                confidence=frame.confidence or 0.8,
+                turn_id=turn_id,
+            )
+        )
+        target_paths.append("geometry.params.x2")
+
+    if frame.geometry.y1_mm is not None:
+        updates.append(
+            UpdateOp(
+                path="geometry.params.y1",
+                op="set",
+                value=float(frame.geometry.y1_mm),
+                producer=Producer.SLOT_MAPPER,
+                confidence=frame.confidence or 0.8,
+                turn_id=turn_id,
+            )
+        )
+        target_paths.append("geometry.params.y1")
+
+    if frame.geometry.y2_mm is not None:
+        updates.append(
+            UpdateOp(
+                path="geometry.params.y2",
+                op="set",
+                value=float(frame.geometry.y2_mm),
+                producer=Producer.SLOT_MAPPER,
+                confidence=frame.confidence or 0.8,
+                turn_id=turn_id,
+            )
+        )
+        target_paths.append("geometry.params.y2")
+
+    if frame.geometry.z_mm is not None:
+        updates.append(
+            UpdateOp(
+                path="geometry.params.module_z",
+                op="set",
+                value=float(frame.geometry.z_mm),
+                producer=Producer.SLOT_MAPPER,
+                confidence=frame.confidence or 0.8,
+                turn_id=turn_id,
+            )
+        )
+        target_paths.append("geometry.params.module_z")
+
+    if frame.geometry.z_planes_mm and len(frame.geometry.z_planes_mm) == 3:
+        for label, value in zip(("z1", "z2", "z3"), frame.geometry.z_planes_mm):
+            updates.append(
+                UpdateOp(
+                    path=f"geometry.params.{label}",
+                    op="set",
+                    value=float(value),
+                    producer=Producer.SLOT_MAPPER,
+                    confidence=frame.confidence or 0.8,
+                    turn_id=turn_id,
+                )
+            )
+            target_paths.append(f"geometry.params.{label}")
+
+    if frame.geometry.radii_mm and len(frame.geometry.radii_mm) == 3:
+        for label, value in zip(("r1", "r2", "r3"), frame.geometry.radii_mm):
+            updates.append(
+                UpdateOp(
+                    path=f"geometry.params.{label}",
+                    op="set",
+                    value=float(value),
+                    producer=Producer.SLOT_MAPPER,
+                    confidence=frame.confidence or 0.8,
+                    turn_id=turn_id,
+                )
+            )
+            target_paths.append(f"geometry.params.{label}")
+
+    for slot_name, param_name in (
+        ("trap_x1_mm", "trap_x1"),
+        ("trap_x2_mm", "trap_x2"),
+        ("trap_x3_mm", "trap_x3"),
+        ("trap_x4_mm", "trap_x4"),
+        ("trap_y1_mm", "trap_y1"),
+        ("trap_y2_mm", "trap_y2"),
+        ("trap_z_mm", "trap_z"),
+        ("para_x_mm", "para_x"),
+        ("para_y_mm", "para_y"),
+        ("para_z_mm", "para_z"),
+        ("para_alpha_deg", "para_alpha"),
+        ("para_theta_deg", "para_theta"),
+        ("para_phi_deg", "para_phi"),
+        ("torus_major_radius_mm", "torus_rtor"),
+        ("torus_minor_radius_mm", "torus_rmax"),
+        ("ellipsoid_ax_mm", "ellipsoid_ax"),
+        ("ellipsoid_by_mm", "ellipsoid_by"),
+        ("ellipsoid_cz_mm", "ellipsoid_cz"),
+        ("elltube_ax_mm", "elltube_ax"),
+        ("elltube_by_mm", "elltube_by"),
+        ("elltube_hz_mm", "elltube_hz"),
+    ):
+        value = getattr(frame.geometry, slot_name)
+        if value is None:
+            continue
+        updates.append(
+            UpdateOp(
+                path=f"geometry.params.{param_name}",
+                op="set",
+                value=float(value),
+                producer=Producer.SLOT_MAPPER,
+                confidence=frame.confidence or 0.8,
+                turn_id=turn_id,
+            )
+        )
+        target_paths.append(f"geometry.params.{param_name}")
+
+    if frame.geometry.polyhedra_sides is not None:
+        updates.append(
+            UpdateOp(
+                path="geometry.params.polyhedra_nsides",
+                op="set",
+                value=int(frame.geometry.polyhedra_sides),
+                producer=Producer.SLOT_MAPPER,
+                confidence=frame.confidence or 0.8,
+                turn_id=turn_id,
+            )
+        )
+        target_paths.append("geometry.params.polyhedra_nsides")
+
+    if frame.geometry.tilt_x_deg is not None:
+        updates.append(
+            UpdateOp(
+                path="geometry.params.tilt_x",
+                op="set",
+                value=float(frame.geometry.tilt_x_deg),
+                producer=Producer.SLOT_MAPPER,
+                confidence=frame.confidence or 0.8,
+                turn_id=turn_id,
+            )
+        )
+        target_paths.append("geometry.params.tilt_x")
+
+    if frame.geometry.tilt_y_deg is not None:
+        updates.append(
+            UpdateOp(
+                path="geometry.params.tilt_y",
+                op="set",
+                value=float(frame.geometry.tilt_y_deg),
+                producer=Producer.SLOT_MAPPER,
+                confidence=frame.confidence or 0.8,
+                turn_id=turn_id,
+            )
+        )
+        target_paths.append("geometry.params.tilt_y")
+
     if frame.materials.primary:
         updates.append(
             UpdateOp(
                 path="materials.selected_materials",
                 op="set",
-                value=[frame.materials.primary],
+                value=[_canonical_material_name(frame.materials.primary)],
                 producer=Producer.SLOT_MAPPER,
                 confidence=frame.confidence or 0.8,
                 turn_id=turn_id,
@@ -234,7 +429,7 @@ def slot_frame_to_candidates(frame: SlotFrame, *, turn_id: int) -> tuple[Candida
 
     user_candidate = CandidateUpdate(
         producer=Producer.USER_EXPLICIT,
-        intent=frame.intent if frame.intent in {Intent.SET, Intent.MODIFY, Intent.REMOVE, Intent.CONFIRM, Intent.QUESTION} else Intent.OTHER,
+        intent=frame.intent if frame.intent in {Intent.SET, Intent.MODIFY, Intent.REMOVE, Intent.CONFIRM, Intent.REJECT, Intent.QUESTION} else Intent.OTHER,
         target_paths=list(target_paths),
         updates=[],
         confidence=frame.confidence or 0.8,

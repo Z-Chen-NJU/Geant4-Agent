@@ -1,0 +1,273 @@
+{
+  "schema_version": "v2",
+  "dataset_name": "multiturn_live_casebank_12",
+  "description": "Cleaned and expanded live multi-turn regression set with overwrite confirm/reject coverage.",
+  "cases": [
+    {
+      "id": "MTM01",
+      "domain": "medical",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "我先要一个用于医学成像的初步辐照场景，细节还没定，你先告诉我还缺什么。",
+      "followup_turns": [
+        "采用 300 mm x 300 mm x 300 mm 的水箱，材料 G4_WATER；源用束流 gamma，能量 6 MeV，位置 (0,0,-400) mm，方向 +z；物理列表 QBBC；输出 root。"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_WATER",
+        "source.type": "beam",
+        "source.particle": "gamma",
+        "output.format": "root"
+      }
+    },
+    {
+      "id": "MTM02",
+      "domain": "aerospace",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "en",
+      "prompt": "I need a first-pass proton irradiation setup for a silicon device; keep it simple for now.",
+      "followup_turns": [
+        "Use a silicon box 50 mm x 50 mm x 5 mm, beam source proton 100 MeV from (0,0,-100) mm along +z, physics FTFP_BERT, output json."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Si",
+        "source.particle": "proton",
+        "output.format": "json"
+      }
+    },
+    {
+      "id": "MTM03",
+      "domain": "industrial_ndt",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "我要做一个 gamma 穿透铁靶的小测试，但我还没把完整参数说完。",
+      "followup_turns": [
+        "请设为半径 40 mm、半长 80 mm 的铁圆柱，材料 G4_Fe；点源 gamma，能量 2 MeV，位置 (0,0,-200) mm，方向 +z；物理列表 Shielding；输出 csv。"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "materials.selected_materials.0": "G4_Fe",
+        "source.type": "point",
+        "output.format": "csv"
+      }
+    },
+    {
+      "id": "MTM04",
+      "domain": "physics",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "en",
+      "prompt": "Gamma point source 1 MeV at (0,0,-100) toward +z; please build the rest.",
+      "followup_turns": [
+        "Set copper box 1 m x 1 m x 1 m, physics FTFP_BERT, output hdf5."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Cu",
+        "source.type": "point",
+        "output.format": "hdf5"
+      }
+    },
+    {
+      "id": "MTM05",
+      "domain": "nuclear_engineering",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "我想做一个中子屏蔽的概念验证，现在先给一个缺参开头。",
+      "followup_turns": [
+        "使用 200 mm x 200 mm x 200 mm 的铅块，材料 G4_Pb；点源 neutron，能量 14 MeV，位置 (0,0,-50) mm，方向 +z；物理列表 QGSP_BERT_HP；输出 xml。"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Pb",
+        "source.particle": "neutron",
+        "output.format": "xml"
+      }
+    },
+    {
+      "id": "MTM06",
+      "domain": "security_screening",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "prompt": "Need a quick cargo-screening toy setup with forward photons, but I have not fixed the target shape, material, source energy, or output format yet.",
+      "followup_turns": [
+        "Use steel cylinder target radius 60 mm half-length 120 mm, beam gamma 3 MeV from (0,0,-500) mm to +z, physics Shielding, output root."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_tubs",
+        "source.type": "beam",
+        "source.particle": "gamma",
+        "output.format": "root"
+      }
+    },
+    {
+      "id": "MTM07",
+      "domain": "semiconductor",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "我想搭一个硅薄片的中子照射测试，但先只给一个简述。",
+      "followup_turns": [
+        "使用 20 mm x 20 mm x 1 mm 的硅片，材料 G4_Si；各向同性 neutron，能量 2 MeV，位置 (0,0,0) mm；物理列表 QGSP_BERT_HP；输出 json。"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Si",
+        "source.type": "isotropic",
+        "output.format": "json"
+      }
+    },
+    {
+      "id": "MTM08",
+      "domain": "education",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "prompt": "For classroom demo, I want gamma attenuation in copper; you can ask only essential missing parts.",
+      "followup_turns": [
+        "Okay, copper box 100 mm x 100 mm x 100 mm, point gamma 1 MeV at (0,0,-200) mm, direction +z, physics FTFP_BERT, output csv."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Cu",
+        "source.type": "point",
+        "output.format": "csv"
+      }
+    },
+    {
+      "id": "MTM09",
+      "domain": "environmental_radiation",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "我想先搭一个空气体积中的低能 gamma 传播场景，细节稍后补。",
+      "followup_turns": [
+        "设为 500 mm x 500 mm x 500 mm 的空气盒，材料 G4_AIR；点源 gamma，能量 0.5 MeV，位置 (0,0,-300) mm，方向 +z；物理列表 QBBC；输出 root。"
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_AIR",
+        "source.particle": "gamma",
+        "output.format": "root"
+      }
+    },
+    {
+      "id": "MTM10",
+      "domain": "high_energy_physics",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "en",
+      "prompt": "Set geometry as a sphere target; I have not decided radius or source details yet.",
+      "followup_turns": [
+        "Sphere target radius 80 mm, lead material, electron point source 5 MeV at (0,0,-200) mm toward +z, physics FTFP_BERT, output hdf5."
+      ],
+      "expected_flow": {
+        "initial_complete": false,
+        "final_complete": true,
+        "require_missing_reduction": true
+      },
+      "expected_final": {
+        "geometry.structure": "single_sphere",
+        "materials.selected_materials.0": "G4_Pb",
+        "source.particle": "e-",
+        "output.format": "hdf5"
+      }
+    },
+    {
+      "id": "MTM11",
+      "domain": "materials_update",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "en",
+      "prompt": "Create a complete setup: 100 mm x 100 mm x 100 mm copper box, point gamma 1 MeV at (0,0,-200) mm toward +z, physics QBBC, output json.",
+      "followup_turns": [
+        "Change the target material to G4_Al and change the output format to root."
+      ],
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Al",
+        "source.type": "point",
+        "output.format": "root"
+      }
+    },
+    {
+      "id": "MTM12",
+      "domain": "overwrite_reject",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "prompt": "请创建一个完整配置：100 mm x 100 mm x 100 mm 的铜盒，材料 G4_Cu；点源 gamma，能量 1 MeV，位置 (0,0,-200) mm，方向 +z；物理列表 QBBC；输出 json。",
+      "followup_turns": [
+        "把材料改成 G4_Al，并把输出格式改成 root。",
+        "保持原值"
+      ],
+      "expected_flow": {
+        "initial_complete": true,
+        "final_complete": true,
+        "require_missing_reduction": false
+      },
+      "expected_final": {
+        "geometry.structure": "single_box",
+        "materials.selected_materials.0": "G4_Cu",
+        "source.type": "point",
+        "output.format": "json"
+      }
+    }
+  ]
+}

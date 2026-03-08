@@ -1,6 +1,35 @@
 from __future__ import annotations
 
+from core.geometry.family_catalog import GEOMETRY_SLOT_TARGET_TO_PATHS
 from core.orchestrator.types import CandidateUpdate, UpdateOp
+
+_DEPENDENT_TARGETS = {
+    "geometry.structure": {"geometry.chosen_skeleton", "geometry.graph_program", "geometry.root_name"},
+    "geometry.graph_program": {"geometry.structure", "geometry.chosen_skeleton", "geometry.root_name"},
+    "geometry.chosen_skeleton": {"geometry.structure", "geometry.graph_program", "geometry.root_name"},
+}
+
+_TARGET_ALIAS_PATHS = {
+    **GEOMETRY_SLOT_TARGET_TO_PATHS,
+    "materials.primary": {"materials.selected_materials", "materials.volume_material_map"},
+    "source.kind": {"source.type"},
+    "source.particle": {"source.particle"},
+    "source.energy_mev": {"source.energy"},
+    "source.position_mm": {"source.position"},
+    "source.direction_vec": {"source.direction"},
+    "physics.explicit_list": {"physics.physics_list"},
+    "physics.recommendation_intent": {"physics.physics_list"},
+    "output.format": {"output.format", "output.path"},
+    "output.path": {"output.path"},
+}
+
+
+def _expand_explicit_targets(target_paths: list[str]) -> list[str]:
+    expanded = {str(path) for path in target_paths if isinstance(path, str) and path}
+    for target in list(expanded):
+        expanded.update(_TARGET_ALIAS_PATHS.get(target, set()))
+        expanded.update(_DEPENDENT_TARGETS.get(target, set()))
+    return sorted(expanded)
 
 
 def _matches_explicit_target(path: str, target_paths: list[str]) -> bool:
@@ -34,7 +63,7 @@ def filter_candidate_by_target_scopes(candidate: CandidateUpdate, target_paths: 
 
 
 def filter_candidate_by_explicit_targets(candidate: CandidateUpdate, target_paths: list[str]) -> CandidateUpdate:
-    explicit_targets = [str(path) for path in target_paths if isinstance(path, str) and path]
+    explicit_targets = _expand_explicit_targets(target_paths)
     if not explicit_targets or not candidate.updates:
         return candidate
     filtered = [u for u in candidate.updates if _matches_explicit_target(u.path, explicit_targets)]

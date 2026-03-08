@@ -1,0 +1,480 @@
+\documentclass[11pt,a4paper]{ctexart}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+\setlist[itemize]{nosep,leftmargin=1.5em}
+\setlist[enumerate]{nosep,leftmargin=1.8em}
+
+\title{Geant4-Agent User Guide and Local Deployment\\Geant4-Agent 使用方法与本地部署说明}
+\author{}
+\date{2026-03-07}
+
+\begin{document}
+\maketitle
+
+\section*{English}
+
+\subsection*{1. Scope}
+
+This guide is for:
+
+\begin{enumerate}
+\item running the project locally with the web UI and multi-turn dialogue
+\item reproducing the same setup on another Windows machine
+\end{enumerate}
+
+The current version is suitable for:
+
+\begin{itemize}
+\item local validation
+\item internal testing
+\item controlled user trials
+\end{itemize}
+
+It is not yet suitable for unrestricted public deployment.
+
+\subsection*{2. Recommended Environment}
+
+\begin{itemize}
+\item OS: Windows 10 / 11
+\item Python: 3.10+
+\item GPU: optional for inference, recommended for local BERT training
+\end{itemize}
+
+\subsection*{3. Create a Virtual Environment}
+
+\begin{verbatim}
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+\end{verbatim}
+
+If PowerShell blocks script execution:
+
+\begin{verbatim}
+Set-ExecutionPolicy -Scope Process RemoteSigned
+\end{verbatim}
+
+\subsection*{4. Install Runtime Dependencies}
+
+Minimum runtime install:
+
+\begin{verbatim}
+python -m pip install torch transformers safetensors
+\end{verbatim}
+
+Example CUDA 12.1 install:
+
+\begin{verbatim}
+python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+python -m pip install transformers safetensors
+\end{verbatim}
+
+\subsection*{5. LLM Provider Configuration}
+
+Configuration directory:
+
+\begin{itemize}
+\item \path{nlu/bert\_lab/configs/}
+\end{itemize}
+
+Example configs:
+
+\begin{itemize}
+\item \path{ollama\_config.json}
+\item \path{openai\_compatible\_config.example.json}
+\item \path{deepseek\_api\_config.example.json}
+\end{itemize}
+
+Recommended local private config:
+
+\begin{itemize}
+\item \path{nlu/bert\_lab/configs/deepseek\_api.local.json}
+\end{itemize}
+
+\subsection*{6. Local Model Directories}
+
+Runtime model preflight checks:
+
+\begin{itemize}
+\item structure model directory
+\item \texttt{ner} model directory
+\end{itemize}
+
+The current code searches for one structure model under:
+
+\begin{itemize}
+\item \path{nlu/bert\_lab/models/structure\_controlled\_v4c\_e1}
+\item \path{nlu/bert\_lab/models/structure\_controlled\_v3\_e1}
+\item \path{nlu/bert\_lab/models/structure\_controlled\_smoke}
+\item \path{nlu/bert\_lab/models/structure\_opt\_v3}
+\item \path{nlu/bert\_lab/models/structure\_opt\_v2}
+\item \path{nlu/bert\_lab/models/structure}
+\end{itemize}
+
+The default NER directory is:
+
+\begin{itemize}
+\item \path{nlu/bert\_lab/models/ner}
+\end{itemize}
+
+Each model directory should at least contain:
+
+\begin{itemize}
+\item \texttt{config.json}
+\item tokenizer assets such as \texttt{tokenizer.json}, \texttt{vocab.txt}, or equivalent
+\end{itemize}
+
+The repository does not ship trained weights by default.
+
+\subsection*{7. Start the Local Web UI}
+
+\begin{verbatim}
+python ui\web\server.py
+\end{verbatim}
+
+Then open:
+
+\begin{itemize}
+\item \url{http://127.0.0.1:8088}
+\end{itemize}
+
+The startup log prints:
+
+\begin{itemize}
+\item current provider
+\item current model
+\item current base URL
+\item model preflight status
+\end{itemize}
+
+\subsection*{8. Basic Local Usage Flow}
+
+Recommended usage sequence:
+
+\begin{enumerate}
+\item start the web server
+\item confirm the active LLM config
+\item submit a natural-language request
+\item answer follow-up questions until the configuration closes
+\item inspect the user-facing summary and JSON output
+\end{enumerate}
+
+Currently supported interaction features:
+
+\begin{itemize}
+\item conservative handling of fuzzy first turns
+\item overwrite confirm / reject
+\item family-aware follow-up questions for graph-like geometry
+\end{itemize}
+
+\subsection*{9. Geometry-Only Theoretical Validation}
+
+\begin{verbatim}
+python -m builder.geometry.cli run_all --outdir builder/geometry/out --n_samples 200 --n_param_sets 100 --seed 7 --dataset builder/geometry/examples/coverage.csv
+\end{verbatim}
+
+Expected outputs:
+
+\begin{itemize}
+\item \path{coverage\_summary.json}
+\item \path{coverage\_checked.jsonl}
+\item \path{feasibility\_summary.json}
+\item \path{ambiguity\_summary.json}
+\end{itemize}
+
+\subsection*{10. Regression Commands}
+
+Stable validated live set:
+
+\begin{verbatim}
+python scripts/run_casebank_regression.py --dataset docs/eval_casebank_multiturn_live_v2_12.json --config nlu/bert_lab/configs/deepseek_api.local.json --outdir docs --baseline docs/casebank_baseline.json --min_confidence 0.6
+\end{verbatim}
+
+Expanded geometry-heavy live set:
+
+\begin{verbatim}
+python scripts/run_casebank_regression.py --dataset docs/eval_casebank_multiturn_live_v3_24.json --config nlu/bert_lab/configs/deepseek_api.local.json --outdir docs --baseline docs/casebank_baseline.json --min_confidence 0.6
+\end{verbatim}
+
+Dataset distribution check:
+
+\begin{verbatim}
+python scripts/verify_eval_casebank.py --dataset docs/eval_casebank_multiturn_live_v3_24.json
+\end{verbatim}
+
+\subsection*{11. Train the Structure Model Locally}
+
+Build the normalized-text dataset:
+
+\begin{verbatim}
+python scripts/build_structure_v2_dataset.py --base nlu/bert_lab/data/controlled_structure.jsonl --extra nlu/bert_lab/data/controlled_multitask.jsonl --out nlu/bert_lab/data/controlled_structure_v2.jsonl --keep_original
+\end{verbatim}
+
+Train:
+
+\begin{verbatim}
+python scripts/train_structure_v2.py --config nlu/bert_lab/configs/structure_train_v2.json --outdir nlu/bert_lab/models/structure_controlled_v5_e2 --device cuda
+\end{verbatim}
+
+\subsection*{12. Deploy on Another Windows Machine}
+
+Recommended sequence:
+
+\begin{enumerate}
+\item copy the repository
+\item create \texttt{.venv}
+\item install runtime dependencies
+\item copy trained model directories into \path{nlu/bert\_lab/models/}
+\item prepare one LLM config file
+\item run \texttt{python ui\textbackslash web\textbackslash server.py}
+\item open \url{http://127.0.0.1:8088}
+\end{enumerate}
+
+If the LLM runs remotely, only the config \path{base\_url} needs to point to the forwarded endpoint.
+
+\subsection*{13. Deployment Recommendation}
+
+Current recommendation:
+
+\begin{itemize}
+\item good for local use, internal testing, and controlled trials
+\item not yet ready for unrestricted public deployment
+\end{itemize}
+
+\newpage
+\section*{中文}
+
+\subsection*{1. 适用范围}
+
+这份说明面向两类场景：
+
+\begin{enumerate}
+\item 在本机启动 Web UI，运行多轮对话
+\item 在另一台 Windows 机器上复现同样的环境
+\end{enumerate}
+
+当前版本适合：
+
+\begin{itemize}
+\item 本地验证
+\item 内部测试
+\item 受控真人试用
+\end{itemize}
+
+当前版本不适合直接做不受控公开部署。
+
+\subsection*{2. 推荐环境}
+
+\begin{itemize}
+\item 操作系统：Windows 10 / 11
+\item Python：3.10+
+\item GPU：推理可选，训练 BERT 时建议使用 NVIDIA GPU
+\end{itemize}
+
+\subsection*{3. 创建虚拟环境}
+
+\begin{verbatim}
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+\end{verbatim}
+
+如果 PowerShell 限制脚本执行：
+
+\begin{verbatim}
+Set-ExecutionPolicy -Scope Process RemoteSigned
+\end{verbatim}
+
+\subsection*{4. 安装运行依赖}
+
+最低运行安装：
+
+\begin{verbatim}
+python -m pip install torch transformers safetensors
+\end{verbatim}
+
+CUDA 12.1 示例：
+
+\begin{verbatim}
+python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+python -m pip install transformers safetensors
+\end{verbatim}
+
+\subsection*{5. LLM 配置}
+
+配置目录：
+
+\begin{itemize}
+\item \path{nlu/bert\_lab/configs/}
+\end{itemize}
+
+可用示例：
+
+\begin{itemize}
+\item \path{ollama\_config.json}
+\item \path{openai\_compatible\_config.example.json}
+\item \path{deepseek\_api\_config.example.json}
+\end{itemize}
+
+推荐本地私有配置：
+
+\begin{itemize}
+\item \path{nlu/bert\_lab/configs/deepseek\_api.local.json}
+\end{itemize}
+
+\subsection*{6. 本地模型目录}
+
+运行时会检查：
+
+\begin{itemize}
+\item structure 模型目录
+\item \texttt{ner} 模型目录
+\end{itemize}
+
+默认 structure 候选目录包括：
+
+\begin{itemize}
+\item \path{nlu/bert\_lab/models/structure\_controlled\_v4c\_e1}
+\item \path{nlu/bert\_lab/models/structure\_controlled\_v3\_e1}
+\item \path{nlu/bert\_lab/models/structure\_controlled\_smoke}
+\item \path{nlu/bert\_lab/models/structure\_opt\_v3}
+\item \path{nlu/bert\_lab/models/structure\_opt\_v2}
+\item \path{nlu/bert\_lab/models/structure}
+\end{itemize}
+
+默认 NER 目录：
+
+\begin{itemize}
+\item \path{nlu/bert\_lab/models/ner}
+\end{itemize}
+
+模型目录至少应包含：
+
+\begin{itemize}
+\item \texttt{config.json}
+\item tokenizer 资产，如 \texttt{tokenizer.json} 或 \texttt{vocab.txt}
+\end{itemize}
+
+仓库默认不附带训练好的权重。
+
+\subsection*{7. 启动本地 Web UI}
+
+\begin{verbatim}
+python ui\web\server.py
+\end{verbatim}
+
+然后访问：
+
+\begin{itemize}
+\item \url{http://127.0.0.1:8088}
+\end{itemize}
+
+启动日志会显示：
+
+\begin{itemize}
+\item 当前 provider
+\item 当前 model
+\item 当前 base URL
+\item model preflight 状态
+\end{itemize}
+
+\subsection*{8. 本地使用流程}
+
+推荐顺序：
+
+\begin{enumerate}
+\item 启动 Web 服务
+\item 确认当前 LLM 配置
+\item 输入自然语言需求
+\item 按系统追问补齐信息
+\item 查看用户层摘要和 JSON 输出
+\end{enumerate}
+
+当前已经支持：
+
+\begin{itemize}
+\item fuzzy 首轮的保守处理
+\item overwrite 确认 / 拒绝
+\item graph 几何的 family-aware 追问
+\end{itemize}
+
+\subsection*{9. 仅运行 geometry 理论验证}
+
+\begin{verbatim}
+python -m builder.geometry.cli run_all --outdir builder/geometry/out --n_samples 200 --n_param_sets 100 --seed 7 --dataset builder/geometry/examples/coverage.csv
+\end{verbatim}
+
+主要输出：
+
+\begin{itemize}
+\item \path{coverage\_summary.json}
+\item \path{coverage\_checked.jsonl}
+\item \path{feasibility\_summary.json}
+\item \path{ambiguity\_summary.json}
+\end{itemize}
+
+\subsection*{10. 回归命令}
+
+当前稳定通过的 live 集：
+
+\begin{verbatim}
+python scripts/run_casebank_regression.py --dataset docs/eval_casebank_multiturn_live_v2_12.json --config nlu/bert_lab/configs/deepseek_api.local.json --outdir docs --baseline docs/casebank_baseline.json --min_confidence 0.6
+\end{verbatim}
+
+扩展的 geometry-heavy live 集：
+
+\begin{verbatim}
+python scripts/run_casebank_regression.py --dataset docs/eval_casebank_multiturn_live_v3_24.json --config nlu/bert_lab/configs/deepseek_api.local.json --outdir docs --baseline docs/casebank_baseline.json --min_confidence 0.6
+\end{verbatim}
+
+检查数据集分布：
+
+\begin{verbatim}
+python scripts/verify_eval_casebank.py --dataset docs/eval_casebank_multiturn_live_v3_24.json
+\end{verbatim}
+
+\subsection*{11. 本地训练 structure 模型}
+
+构建数据集：
+
+\begin{verbatim}
+python scripts/build_structure_v2_dataset.py --base nlu/bert_lab/data/controlled_structure.jsonl --extra nlu/bert_lab/data/controlled_multitask.jsonl --out nlu/bert_lab/data/controlled_structure_v2.jsonl --keep_original
+\end{verbatim}
+
+训练命令：
+
+\begin{verbatim}
+python scripts/train_structure_v2.py --config nlu/bert_lab/configs/structure_train_v2.json --outdir nlu/bert_lab/models/structure_controlled_v5_e2 --device cuda
+\end{verbatim}
+
+\subsection*{12. 在另一台 Windows 机器部署}
+
+推荐顺序：
+
+\begin{enumerate}
+\item 复制仓库
+\item 创建 \texttt{.venv}
+\item 安装运行依赖
+\item 复制训练好的模型到 \path{nlu/bert\_lab/models/}
+\item 准备一个 LLM 配置文件
+\item 运行 \texttt{python ui\textbackslash web\textbackslash server.py}
+\item 打开 \url{http://127.0.0.1:8088}
+\end{enumerate}
+
+如果 LLM 在远端，只需把配置中的 \path{base\_url} 指向 SSH 转发后的地址。
+
+\subsection*{13. 部署建议}
+
+当前建议是：
+
+\begin{itemize}
+\item 适合本地使用、内部测试、受控试用
+\item 不建议直接进行不受控公开部署
+\end{itemize}
+
+\end{document}

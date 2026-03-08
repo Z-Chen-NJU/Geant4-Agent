@@ -31,6 +31,11 @@ class Sphere(Part):
 
 
 @dataclass(frozen=True)
+class Orb(Part):
+    rmax: float
+
+
+@dataclass(frozen=True)
 class Cons(Part):
     rmax1: float
     rmax2: float
@@ -58,6 +63,54 @@ class CutTubs(Part):
     hz: float
     tilt_x: float = 0.0
     tilt_y: float = 0.0
+
+
+@dataclass(frozen=True)
+class Trap(Part):
+    x1: float
+    x2: float
+    x3: float
+    x4: float
+    y1: float
+    y2: float
+    z: float
+
+
+@dataclass(frozen=True)
+class Para(Part):
+    x: float
+    y: float
+    z: float
+    alpha: float = 0.0
+    theta: float = 0.0
+    phi: float = 0.0
+
+
+@dataclass(frozen=True)
+class Torus(Part):
+    rtor: float
+    rmax: float
+
+
+@dataclass(frozen=True)
+class Ellipsoid(Part):
+    ax: float
+    by: float
+    cz: float
+
+
+@dataclass(frozen=True)
+class EllipticalTube(Part):
+    ax: float
+    by: float
+    hz: float
+
+
+@dataclass(frozen=True)
+class Polyhedra(Part):
+    nsides: int
+    z_planes: Tuple[float, ...]
+    rmax: Tuple[float, ...]
 
 
 @dataclass(frozen=True)
@@ -134,10 +187,17 @@ Node = Union[
     Box,
     Tubs,
     Sphere,
+    Orb,
     Cons,
     Trd,
     Polycone,
     CutTubs,
+    Trap,
+    Para,
+    Torus,
+    Ellipsoid,
+    EllipticalTube,
+    Polyhedra,
     ShellTubsFromThicknesses,
     Nest,
     StackZ,
@@ -161,10 +221,17 @@ _TYPE_MAP = {
     "Box": Box,
     "Tubs": Tubs,
     "Sphere": Sphere,
+    "Orb": Orb,
     "Cons": Cons,
     "Trd": Trd,
     "Polycone": Polycone,
     "CutTubs": CutTubs,
+    "Trap": Trap,
+    "Para": Para,
+    "Torus": Torus,
+    "Ellipsoid": Ellipsoid,
+    "EllipticalTube": EllipticalTube,
+    "Polyhedra": Polyhedra,
     "ShellTubsFromThicknesses": ShellTubsFromThicknesses,
     "Nest": Nest,
     "StackZ": StackZ,
@@ -197,6 +264,8 @@ def parse_graph(data: Dict[str, Any]) -> Graph:
             node = Tubs(id=nid, rmax=float(n["rmax"]), hz=float(n["hz"]))
         elif cls is Sphere:
             node = Sphere(id=nid, rmax=float(n["rmax"]))
+        elif cls is Orb:
+            node = Orb(id=nid, rmax=float(n["rmax"]))
         elif cls is Cons:
             node = Cons(id=nid, rmax1=float(n["rmax1"]), rmax2=float(n["rmax2"]), hz=float(n["hz"]))
         elif cls is Trd:
@@ -221,6 +290,40 @@ def parse_graph(data: Dict[str, Any]) -> Graph:
                 hz=float(n["hz"]),
                 tilt_x=float(n.get("tilt_x", 0.0)),
                 tilt_y=float(n.get("tilt_y", 0.0)),
+            )
+        elif cls is Trap:
+            node = Trap(
+                id=nid,
+                x1=float(n["x1"]),
+                x2=float(n["x2"]),
+                x3=float(n["x3"]),
+                x4=float(n["x4"]),
+                y1=float(n["y1"]),
+                y2=float(n["y2"]),
+                z=float(n["z"]),
+            )
+        elif cls is Para:
+            node = Para(
+                id=nid,
+                x=float(n["x"]),
+                y=float(n["y"]),
+                z=float(n["z"]),
+                alpha=float(n.get("alpha", 0.0)),
+                theta=float(n.get("theta", 0.0)),
+                phi=float(n.get("phi", 0.0)),
+            )
+        elif cls is Torus:
+            node = Torus(id=nid, rtor=float(n["rtor"]), rmax=float(n["rmax"]))
+        elif cls is Ellipsoid:
+            node = Ellipsoid(id=nid, ax=float(n["ax"]), by=float(n["by"]), cz=float(n["cz"]))
+        elif cls is EllipticalTube:
+            node = EllipticalTube(id=nid, ax=float(n["ax"]), by=float(n["by"]), hz=float(n["hz"]))
+        elif cls is Polyhedra:
+            node = Polyhedra(
+                id=nid,
+                nsides=int(n["nsides"]),
+                z_planes=_as_tuple_floats(n["z_planes"]),
+                rmax=_as_tuple_floats(n["rmax"]),
             )
         elif cls is ShellTubsFromThicknesses:
             node = ShellTubsFromThicknesses(
@@ -306,6 +409,8 @@ def graph_to_dict(graph: Graph) -> Dict[str, Any]:
             out_nodes.append({"id": node.id, "type": "Tubs", "rmax": node.rmax, "hz": node.hz})
         elif isinstance(node, Sphere):
             out_nodes.append({"id": node.id, "type": "Sphere", "rmax": node.rmax})
+        elif isinstance(node, Orb):
+            out_nodes.append({"id": node.id, "type": "Orb", "rmax": node.rmax})
         elif isinstance(node, Cons):
             out_nodes.append({"id": node.id, "type": "Cons", "rmax1": node.rmax1, "rmax2": node.rmax2, "hz": node.hz})
         elif isinstance(node, Trd):
@@ -338,6 +443,49 @@ def graph_to_dict(graph: Graph) -> Dict[str, Any]:
                     "hz": node.hz,
                     "tilt_x": node.tilt_x,
                     "tilt_y": node.tilt_y,
+                }
+            )
+        elif isinstance(node, Trap):
+            out_nodes.append(
+                {
+                    "id": node.id,
+                    "type": "Trap",
+                    "x1": node.x1,
+                    "x2": node.x2,
+                    "x3": node.x3,
+                    "x4": node.x4,
+                    "y1": node.y1,
+                    "y2": node.y2,
+                    "z": node.z,
+                }
+            )
+        elif isinstance(node, Para):
+            out_nodes.append(
+                {
+                    "id": node.id,
+                    "type": "Para",
+                    "x": node.x,
+                    "y": node.y,
+                    "z": node.z,
+                    "alpha": node.alpha,
+                    "theta": node.theta,
+                    "phi": node.phi,
+                }
+            )
+        elif isinstance(node, Torus):
+            out_nodes.append({"id": node.id, "type": "Torus", "rtor": node.rtor, "rmax": node.rmax})
+        elif isinstance(node, Ellipsoid):
+            out_nodes.append({"id": node.id, "type": "Ellipsoid", "ax": node.ax, "by": node.by, "cz": node.cz})
+        elif isinstance(node, EllipticalTube):
+            out_nodes.append({"id": node.id, "type": "EllipticalTube", "ax": node.ax, "by": node.by, "hz": node.hz})
+        elif isinstance(node, Polyhedra):
+            out_nodes.append(
+                {
+                    "id": node.id,
+                    "type": "Polyhedra",
+                    "nsides": node.nsides,
+                    "z_planes": list(node.z_planes),
+                    "rmax": list(node.rmax),
                 }
             )
         elif isinstance(node, ShellTubsFromThicknesses):

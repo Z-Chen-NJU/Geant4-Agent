@@ -40,7 +40,7 @@ class CandidatePreprocessTest(unittest.TestCase):
         filtered = filter_candidate_by_explicit_targets(candidate, ["output.format"])
 
         self.assertEqual([update.path for update in filtered.updates], ["output.format"])
-        self.assertEqual(filtered.target_paths, ["output.format"])
+        self.assertEqual(filtered.target_paths, ["output.format", "output.path"])
 
     def test_pending_partition_blocks_only_conflicting_paths(self) -> None:
         candidate = CandidateUpdate(
@@ -78,6 +78,31 @@ class CandidatePreprocessTest(unittest.TestCase):
         self.assertEqual([update.path for update in filtered.updates], ["output.format"])
         self.assertEqual([update.path for update in blocked], [])
         self.assertEqual([update.path for update in replacements], ["materials.selected_materials"])
+
+    def test_slot_style_targets_expand_to_canonical_paths(self) -> None:
+        candidate = CandidateUpdate(
+            producer=Producer.SLOT_MAPPER,
+            intent=Intent.SET,
+            target_paths=["materials.selected_materials", "materials.volume_material_map"],
+            updates=[
+                UpdateOp(
+                    path="materials.selected_materials",
+                    op="set",
+                    value=["G4_STAINLESS-STEEL"],
+                    producer=Producer.SLOT_MAPPER,
+                    confidence=0.9,
+                    turn_id=1,
+                ),
+            ],
+            confidence=0.9,
+            rationale="slot_material",
+        )
+
+        filtered = filter_candidate_by_explicit_targets(candidate, ["materials.primary"])
+
+        self.assertEqual([update.path for update in filtered.updates], ["materials.selected_materials"])
+        self.assertIn("materials.selected_materials", filtered.target_paths)
+        self.assertIn("materials.volume_material_map", filtered.target_paths)
 
 
 if __name__ == "__main__":

@@ -10,15 +10,22 @@ from .dsl import (
     Box,
     Cons,
     CutTubs,
+    EllipticalTube,
+    Ellipsoid,
+    Orb,
     Transform,
     Graph,
     GridXY,
     Nest,
+    Para,
     Polycone,
+    Polyhedra,
     Ring,
     ShellTubsFromThicknesses,
     Sphere,
     StackZ,
+    Torus,
+    Trap,
     Trd,
     Tubs,
 )
@@ -28,8 +35,15 @@ from .geom import (
     aabb_from_box,
     aabb_from_cons,
     aabb_from_cuttubs,
+    aabb_from_elliptical_tube,
+    aabb_from_ellipsoid,
+    aabb_from_orb,
+    aabb_from_para,
     aabb_from_polycone,
+    aabb_from_polyhedra,
     aabb_from_sphere,
+    aabb_from_torus,
+    aabb_from_trap,
     aabb_from_trd,
     aabb_from_tubs,
     aabb_intersection,
@@ -118,6 +132,12 @@ class FeasibilityChecker:
                 self._suggest(node.id, "Set rmax>0")
             aabb = aabb_from_sphere(node.rmax)
 
+        elif isinstance(node, Orb):
+            if node.rmax <= 0:
+                self._error(ErrorCode.E_SOLID_PARAM, node.id, "Orb rmax must be > 0")
+                self._suggest(node.id, "Set rmax>0")
+            aabb = aabb_from_orb(node.rmax)
+
         elif isinstance(node, Cons):
             if node.rmax1 <= 0 or node.rmax2 <= 0 or node.hz <= 0:
                 self._error(ErrorCode.E_SOLID_PARAM, node.id, "Cons rmax1,rmax2,hz must be > 0")
@@ -144,6 +164,50 @@ class FeasibilityChecker:
                 self._error(ErrorCode.E_SOLID_PARAM, node.id, "CutTubs rmax,hz must be > 0")
                 self._suggest(node.id, "Set rmax>0 and hz>0")
             aabb = aabb_from_cuttubs(node.rmax, node.hz, node.tilt_x, node.tilt_y)
+
+        elif isinstance(node, Trap):
+            if min(node.x1, node.x2, node.x3, node.x4, node.y1, node.y2, node.z) <= 0:
+                self._error(ErrorCode.E_SOLID_PARAM, node.id, "Trap x1,x2,x3,x4,y1,y2,z must be > 0")
+                self._suggest(node.id, "Set trap x1,x2,x3,x4,y1,y2,z > 0")
+            aabb = aabb_from_trap(node.x1, node.x2, node.x3, node.x4, node.y1, node.y2, node.z)
+
+        elif isinstance(node, Para):
+            if node.x <= 0 or node.y <= 0 or node.z <= 0:
+                self._error(ErrorCode.E_SOLID_PARAM, node.id, "Para x,y,z must be > 0")
+                self._suggest(node.id, "Set para x,y,z > 0")
+            aabb = aabb_from_para(node.x, node.y, node.z, node.alpha, node.theta, node.phi)
+
+        elif isinstance(node, Torus):
+            if node.rtor <= 0 or node.rmax <= 0:
+                self._error(ErrorCode.E_SOLID_PARAM, node.id, "Torus rtor,rmax must be > 0")
+                self._suggest(node.id, "Set rtor>0 and rmax>0")
+            elif node.rmax >= node.rtor:
+                self._warn(ErrorCode.E_OVERLAP_RISK, node.id, "Torus minor radius is large relative to major radius")
+            aabb = aabb_from_torus(node.rtor, node.rmax)
+
+        elif isinstance(node, Ellipsoid):
+            if node.ax <= 0 or node.by <= 0 or node.cz <= 0:
+                self._error(ErrorCode.E_SOLID_PARAM, node.id, "Ellipsoid ax,by,cz must be > 0")
+                self._suggest(node.id, "Set ellipsoid axes > 0")
+            aabb = aabb_from_ellipsoid(node.ax, node.by, node.cz)
+
+        elif isinstance(node, EllipticalTube):
+            if node.ax <= 0 or node.by <= 0 or node.hz <= 0:
+                self._error(ErrorCode.E_SOLID_PARAM, node.id, "EllipticalTube ax,by,hz must be > 0")
+                self._suggest(node.id, "Set elliptical tube axes and hz > 0")
+            aabb = aabb_from_elliptical_tube(node.ax, node.by, node.hz)
+
+        elif isinstance(node, Polyhedra):
+            if node.nsides < 3:
+                self._error(ErrorCode.E_SOLID_PARAM, node.id, "Polyhedra nsides must be >= 3")
+                self._suggest(node.id, "Set polyhedra nsides >= 3")
+            if len(node.z_planes) < 2 or len(node.z_planes) != len(node.rmax):
+                self._error(ErrorCode.E_SOLID_PARAM, node.id, "Polyhedra requires matching z_planes/rmax with len>=2")
+                self._suggest(node.id, "Provide z_planes and rmax arrays with same length >= 2")
+            if any(r <= 0 for r in node.rmax):
+                self._error(ErrorCode.E_SOLID_PARAM, node.id, "Polyhedra rmax entries must be > 0")
+                self._suggest(node.id, "Set all polyhedra rmax > 0")
+            aabb = aabb_from_polyhedra(node.z_planes, node.rmax)
 
         elif isinstance(node, ShellTubsFromThicknesses):
             if node.inner_r < 0 or node.hz <= 0:

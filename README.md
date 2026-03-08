@@ -71,6 +71,32 @@ python ui/web/server.py
 Then open:
 - http://127.0.0.1:8088
 
+## Casebank Regression (EN+ZH PDF)
+
+Run the fixed 20-case regression set and generate bilingual LaTeX/PDF reports:
+
+```powershell
+python scripts/run_casebank_regression.py --dataset docs/eval_casebank_v1_20.json --config nlu/bert_lab/configs/ollama_config.json --outdir docs
+```
+
+Run the missing-parameter multi-turn regression set:
+
+```powershell
+python scripts/run_casebank_regression.py --dataset docs/eval_casebank_missing_multiturn_v1_10.json --config nlu/bert_lab/configs/ollama_config.json --outdir docs
+```
+
+Set a dedicated baseline for the missing multi-turn set:
+
+```powershell
+python scripts/run_casebank_regression.py --dataset docs/eval_casebank_missing_multiturn_v1_10.json --config nlu/bert_lab/configs/ollama_config.json --outdir docs --baseline docs/casebank_missing_multiturn_baseline.json --set_baseline
+```
+
+Set/update baseline:
+
+```powershell
+python scripts/run_casebank_regression.py --dataset docs/eval_casebank_v1_20.json --config nlu/bert_lab/configs/ollama_config.json --outdir docs --set_baseline
+```
+
 ## LLM Provider Config (Ollama / OpenAI-Compatible)
 
 The project now supports multiple LLM backends through config files:

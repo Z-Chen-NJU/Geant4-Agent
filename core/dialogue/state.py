@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.config.field_registry import friendly_labels
+from core.config.field_registry import friendly_labels, is_user_visible_summary_path
 from core.orchestrator.path_ops import get_path
 from core.dialogue.types import DialogueDecision
 
@@ -50,10 +50,15 @@ def build_dialogue_summary(
     config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     confirmed_fact_paths = confirmed_fact_paths or []
+    visible_updated = _filter_summary_paths(decision.updated_paths)
+    visible_answered = _filter_summary_paths(decision.answered_this_turn)
+    visible_pending = _filter_summary_paths(decision.missing_fields)
+    visible_asked = _filter_summary_paths(decision.asked_fields)
+    visible_confirmed = _filter_summary_paths(confirmed_fact_paths)
     grouped_status = build_grouped_status(
-        updated_paths=decision.updated_paths,
-        pending_paths=decision.missing_fields,
-        confirmed_paths=confirmed_fact_paths,
+        updated_paths=visible_updated,
+        pending_paths=visible_pending,
+        confirmed_paths=visible_confirmed,
         lang=lang,
     )
     available_explanations = collect_available_explanations(config or {}, lang=lang)
@@ -61,11 +66,11 @@ def build_dialogue_summary(
         "status": "complete" if is_complete else "pending",
         "last_action": decision.action.value,
         "user_intent": decision.user_intent,
-        "updated_fields": friendly_labels(decision.updated_paths[:5], lang),
-        "answered_fields": friendly_labels(decision.answered_this_turn[:5], lang),
-        "pending_fields": friendly_labels(decision.missing_fields[:5], lang),
-        "next_questions": friendly_labels(decision.asked_fields[:3], lang),
-        "recent_confirmed": friendly_labels(confirmed_fact_paths[:5], lang),
+        "updated_fields": friendly_labels(visible_updated[:5], lang),
+        "answered_fields": friendly_labels(visible_answered[:5], lang),
+        "pending_fields": friendly_labels(visible_pending[:5], lang),
+        "next_questions": friendly_labels(visible_asked[:3], lang),
+        "recent_confirmed": friendly_labels(visible_confirmed[:5], lang),
         "memory_depth": memory_depth,
         "grouped_status": grouped_status,
         "available_explanations": available_explanations,
@@ -107,6 +112,10 @@ def _unique(items: list[str]) -> list[str]:
     return list(dict.fromkeys(item for item in items if item))
 
 
+def _filter_summary_paths(paths: list[str]) -> list[str]:
+    return [path for path in paths if is_user_visible_summary_path(path)]
+
+
 def build_grouped_status(
     *,
     updated_paths: list[str],
@@ -117,9 +126,15 @@ def build_grouped_status(
     lang_key = "zh" if lang == "zh" else "en"
     grouped: dict[str, dict[str, Any]] = {}
     for domain in _DOMAIN_ORDER:
-        domain_updated = _unique([path for path in updated_paths if _domain_for_path(path) == domain])
-        domain_pending = _unique([path for path in pending_paths if _domain_for_path(path) == domain])
-        domain_confirmed = _unique([path for path in confirmed_paths if _domain_for_path(path) == domain])
+        domain_updated = _unique(
+            [path for path in updated_paths if _domain_for_path(path) == domain and is_user_visible_summary_path(path)]
+        )
+        domain_pending = _unique(
+            [path for path in pending_paths if _domain_for_path(path) == domain and is_user_visible_summary_path(path)]
+        )
+        domain_confirmed = _unique(
+            [path for path in confirmed_paths if _domain_for_path(path) == domain and is_user_visible_summary_path(path)]
+        )
         if not (domain_updated or domain_pending or domain_confirmed):
             continue
         grouped[domain] = {

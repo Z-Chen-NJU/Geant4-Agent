@@ -35,6 +35,38 @@ class DialogueStateTest(unittest.TestCase):
         self.assertIn("source", summary["grouped_status"])
         self.assertIn("materials", summary["grouped_status"])
 
+    def test_build_dialogue_summary_hides_internal_metadata_fields(self) -> None:
+        decision = DialogueDecision(
+            action=DialogueAction.SUMMARIZE_PROGRESS,
+            updated_paths=[
+                "materials.selected_materials",
+                "materials.selection_source",
+                "geometry.graph_program",
+                "physics.backup_physics_list",
+                "physics.covered_processes",
+                "physics.selection_reasons",
+            ],
+            missing_fields=["output.format"],
+            answered_this_turn=["materials.selection_source"],
+            user_intent="SET",
+        )
+        summary = build_dialogue_summary(
+            decision,
+            lang="en",
+            is_complete=False,
+            confirmed_fact_paths=["materials.selected_materials", "physics.selection_reasons"],
+        )
+        self.assertIn("selected materials", summary["updated_fields"])
+        self.assertNotIn("materials.selection_source", summary["updated_fields"])
+        self.assertNotIn("backup physics list", summary["updated_fields"])
+        self.assertNotIn("geometry.graph_program", summary["updated_fields"])
+        self.assertNotIn("physics.covered_processes", summary["updated_fields"])
+        self.assertEqual(summary["answered_fields"], [])
+        self.assertEqual(summary["recent_confirmed"], ["selected materials"])
+        grouped = summary["grouped_status"]
+        self.assertEqual(grouped["materials"]["updated_fields"], ["selected materials"])
+        self.assertNotIn("physics", grouped)
+
     def test_sync_dialogue_state_accumulates_memory(self) -> None:
         state = SimpleNamespace(
             history=[{"role": "user", "content": "set energy"}],

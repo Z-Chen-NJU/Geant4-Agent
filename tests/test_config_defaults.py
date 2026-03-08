@@ -20,7 +20,8 @@ class ConfigDefaultsTest(unittest.TestCase):
         legacy_cfg = build_legacy_default_config()
 
         self.assertIn("root_name", strict_cfg["geometry"])
-        self.assertNotIn("graph_program", strict_cfg["geometry"])
+        self.assertIn("graph_program", strict_cfg["geometry"])
+        self.assertIn("chosen_skeleton", strict_cfg["geometry"])
 
         self.assertIn("graph_program", legacy_cfg["geometry"])
         self.assertIn("chosen_skeleton", legacy_cfg["geometry"])

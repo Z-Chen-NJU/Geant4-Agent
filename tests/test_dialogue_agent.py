@@ -93,8 +93,41 @@ class DialogueAgentTest(unittest.TestCase):
             ollama_config="",
             user_temperature=1.0,
         )
-        self.assertIn("Please confirm", msg)
+        self.assertIn("Reply 'confirm' to apply it", msg)
         self.assertIn("G4_Cu -> G4_Al", msg)
+
+    def test_policy_can_emit_overwrite_rejection(self) -> None:
+        decision = decide_dialogue_action(
+            user_intent="REJECT",
+            is_complete=False,
+            asked_fields=[],
+            missing_fields=["output.path"],
+            updated_paths=[],
+            answered_this_turn=[],
+            rejected_overwrite_preview=[{"path": "materials.selected_materials", "old": "G4_Cu", "new": "G4_Al"}],
+        )
+        self.assertEqual(decision.action, DialogueAction.REJECT_OVERWRITE)
+
+    def test_renderer_can_emit_overwrite_rejection(self) -> None:
+        decision = decide_dialogue_action(
+            user_intent="REJECT",
+            is_complete=False,
+            asked_fields=[],
+            missing_fields=["output.path"],
+            updated_paths=[],
+            answered_this_turn=[],
+            rejected_overwrite_preview=[{"path": "materials.selected_materials", "old": "G4_Cu", "new": "G4_Al"}],
+        )
+        msg = render_dialogue_message(
+            decision,
+            lang="en",
+            use_llm_question=False,
+            ollama_config="",
+            user_temperature=1.0,
+        )
+        self.assertIn("kept the current value", msg)
+        self.assertIn("material", msg.lower())
+        self.assertIn("I still need output path", msg)
 
     def test_renderer_can_explain_choice(self) -> None:
         decision = decide_dialogue_action(

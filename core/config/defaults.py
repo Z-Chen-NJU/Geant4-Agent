@@ -8,14 +8,13 @@ def geometry_block(*, strict: bool) -> dict[str, Any]:
         "structure": None,
         "params": {},
         "feasible": None,
+        "root_name": None,
+        "graph_program": None,
+        "chosen_skeleton": None,
     }
-    if strict:
-        block["root_name"] = None
-    else:
+    if not strict:
         block.update(
             {
-                "graph_program": None,
-                "chosen_skeleton": None,
                 "dsl": None,
                 "errors": [],
             }
@@ -84,4 +83,3 @@ def build_legacy_default_config() -> dict[str, Any]:
         "output": output_block(),
         "notes": [],
     }
-

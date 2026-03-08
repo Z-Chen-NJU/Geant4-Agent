@@ -5,12 +5,12 @@ from core.validation.minimal_schema import get_local_required_paths
 
 
 PHASE_TRANSITION_TABLE: dict[Phase, dict] = {
-    Phase.GEOMETRY: {"accept_intents": {"SET", "MODIFY", "CONFIRM", "QUESTION"}, "next_if_local_ok": Phase.MATERIALS},
-    Phase.MATERIALS: {"accept_intents": {"SET", "MODIFY", "CONFIRM", "QUESTION"}, "next_if_local_ok": Phase.SOURCE},
-    Phase.SOURCE: {"accept_intents": {"SET", "MODIFY", "CONFIRM", "QUESTION"}, "next_if_local_ok": Phase.PHYSICS},
-    Phase.PHYSICS: {"accept_intents": {"SET", "MODIFY", "CONFIRM", "QUESTION"}, "next_if_local_ok": Phase.OUTPUT},
-    Phase.OUTPUT: {"accept_intents": {"SET", "MODIFY", "CONFIRM", "QUESTION"}, "next_if_local_ok": Phase.FINALIZE},
-    Phase.FINALIZE: {"accept_intents": {"SET", "MODIFY", "CONFIRM", "QUESTION"}, "next_if_local_ok": Phase.FINALIZE},
+    Phase.GEOMETRY: {"accept_intents": {"SET", "MODIFY", "CONFIRM", "REJECT", "QUESTION"}, "next_if_local_ok": Phase.MATERIALS},
+    Phase.MATERIALS: {"accept_intents": {"SET", "MODIFY", "CONFIRM", "REJECT", "QUESTION"}, "next_if_local_ok": Phase.SOURCE},
+    Phase.SOURCE: {"accept_intents": {"SET", "MODIFY", "CONFIRM", "REJECT", "QUESTION"}, "next_if_local_ok": Phase.PHYSICS},
+    Phase.PHYSICS: {"accept_intents": {"SET", "MODIFY", "CONFIRM", "REJECT", "QUESTION"}, "next_if_local_ok": Phase.OUTPUT},
+    Phase.OUTPUT: {"accept_intents": {"SET", "MODIFY", "CONFIRM", "REJECT", "QUESTION"}, "next_if_local_ok": Phase.FINALIZE},
+    Phase.FINALIZE: {"accept_intents": {"SET", "MODIFY", "CONFIRM", "REJECT", "QUESTION"}, "next_if_local_ok": Phase.FINALIZE},
 }
 
 

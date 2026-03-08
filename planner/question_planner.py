@@ -55,7 +55,14 @@ def plan_questions(
         return []
 
     local_order = [p for p in get_local_required_paths(phase) if p in missing_paths]
-    pool = local_order or list(missing_paths)
+    semantic_geometry = [p for p in missing_paths if p.startswith("geometry.ask.")]
+    if semantic_geometry:
+        pool: list[str] = []
+        for path in semantic_geometry + local_order + list(missing_paths):
+            if path not in pool:
+                pool.append(path)
+    else:
+        pool = local_order or list(missing_paths)
     open_queue = [p for p in (open_questions or []) if p in pool]
     last_asked = set(last_asked_paths or [])
     attempts = question_attempts or {}

@@ -1,0 +1,95 @@
+{
+  "generated_at": "2026-03-05_231154",
+  "summary": {
+    "total_cases": 20,
+    "pass_count": 19,
+    "fail_count": 1,
+    "pass_rate": 0.95,
+    "expected_complete_count": 10,
+    "actual_complete_count": 9,
+    "complete_alignment_rate": 0.95,
+    "llm_used_rate": 1.0
+  },
+  "results": [
+    {
+      "case_id": "PF01",
+      "pass_case": true
+    },
+    {
+      "case_id": "PF02",
+      "pass_case": true
+    },
+    {
+      "case_id": "PF03",
+      "pass_case": true
+    },
+    {
+      "case_id": "PF04",
+      "pass_case": false
+    },
+    {
+      "case_id": "PF05",
+      "pass_case": true
+    },
+    {
+      "case_id": "PM01",
+      "pass_case": true
+    },
+    {
+      "case_id": "PM02",
+      "pass_case": true
+    },
+    {
+      "case_id": "PM03",
+      "pass_case": true
+    },
+    {
+      "case_id": "PM04",
+      "pass_case": true
+    },
+    {
+      "case_id": "PM05",
+      "pass_case": true
+    },
+    {
+      "case_id": "FF01",
+      "pass_case": true
+    },
+    {
+      "case_id": "FF02",
+      "pass_case": true
+    },
+    {
+      "case_id": "FF03",
+      "pass_case": true
+    },
+    {
+      "case_id": "FF04",
+      "pass_case": true
+    },
+    {
+      "case_id": "FF05",
+      "pass_case": true
+    },
+    {
+      "case_id": "FM01",
+      "pass_case": true
+    },
+    {
+      "case_id": "FM02",
+      "pass_case": true
+    },
+    {
+      "case_id": "FM03",
+      "pass_case": true
+    },
+    {
+      "case_id": "FM04",
+      "pass_case": true
+    },
+    {
+      "case_id": "FM05",
+      "pass_case": true
+    }
+  ]
+}

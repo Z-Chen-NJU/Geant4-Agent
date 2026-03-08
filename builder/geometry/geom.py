@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -36,6 +37,11 @@ def aabb_from_sphere(rmax: float) -> AABB:
     return AABB(x=d, y=d, z=d)
 
 
+def aabb_from_orb(rmax: float) -> AABB:
+    d = 2.0 * rmax
+    return AABB(x=d, y=d, z=d)
+
+
 def aabb_from_cons(rmax1: float, rmax2: float, hz: float) -> AABB:
     rmax = max(rmax1, rmax2)
     d = 2.0 * rmax
@@ -65,6 +71,40 @@ def aabb_from_cuttubs(rmax: float, hz: float, tilt_x: float = 0.0, tilt_y: float
         inflate = 1.0 + min(0.2, (abs(tilt_x) + abs(tilt_y)) * 0.01)
         return AABB(x=base.x * inflate, y=base.y * inflate, z=base.z * inflate)
     return base
+
+
+def aabb_from_trap(x1: float, x2: float, x3: float, x4: float, y1: float, y2: float, z: float) -> AABB:
+    return AABB(x=max(x1, x2, x3, x4), y=max(y1, y2), z=z)
+
+
+def aabb_from_para(x: float, y: float, z: float, alpha: float = 0.0, theta: float = 0.0, phi: float = 0.0) -> AABB:
+    inflate_x = 2.0 * z * abs(math.tan(math.radians(alpha))) if abs(alpha) > 1e-9 else 0.0
+    inflate_y = 2.0 * z * abs(math.tan(math.radians(theta))) if abs(theta) > 1e-9 else 0.0
+    inflate_xy = 2.0 * z * abs(math.tan(math.radians(phi))) if abs(phi) > 1e-9 else 0.0
+    return AABB(x=x + inflate_x + inflate_xy, y=y + inflate_y + inflate_xy, z=z)
+
+
+def aabb_from_torus(rtor: float, rmax: float) -> AABB:
+    span_xy = 2.0 * (rtor + rmax)
+    return AABB(x=span_xy, y=span_xy, z=2.0 * rmax)
+
+
+def aabb_from_ellipsoid(ax: float, by: float, cz: float) -> AABB:
+    return AABB(x=2.0 * ax, y=2.0 * by, z=2.0 * cz)
+
+
+def aabb_from_elliptical_tube(ax: float, by: float, hz: float) -> AABB:
+    return AABB(x=2.0 * ax, y=2.0 * by, z=2.0 * hz)
+
+
+def aabb_from_polyhedra(z_planes: Tuple[float, ...], rmax: Tuple[float, ...]) -> AABB:
+    if not z_planes or not rmax:
+        return AABB(x=0.0, y=0.0, z=0.0)
+    zmin = min(z_planes)
+    zmax = max(z_planes)
+    rr = max(rmax)
+    d = 2.0 * rr
+    return AABB(x=d, y=d, z=(zmax - zmin))
 
 
 def aabb_apply_transform(base: AABB, rx: float, ry: float, rz: float) -> AABB:

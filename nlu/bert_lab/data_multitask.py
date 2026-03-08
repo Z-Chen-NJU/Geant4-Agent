@@ -9,15 +9,22 @@ from typing import Dict, List, Tuple
 from builder.geometry.library import (
     sample_boolean_boxes,
     sample_single_cuttubs,
+    sample_single_elltube,
+    sample_single_ellipsoid,
     sample_grid_modules,
     sample_nest_box_tubs,
+    sample_single_para,
     sample_single_polycone,
+    sample_single_polyhedra,
     sample_ring_modules,
     sample_shell_nested,
     sample_stack_in_box,
     sample_single_box,
     sample_single_cons,
+    sample_single_orb,
     sample_single_sphere,
+    sample_single_torus,
+    sample_single_trap,
     sample_single_trd,
     sample_single_tubs,
 )
@@ -53,6 +60,28 @@ PARAM_KEYS = [
     "r1",
     "r2",
     "r3",
+    "trap_x1",
+    "trap_x2",
+    "trap_x3",
+    "trap_x4",
+    "trap_y1",
+    "trap_y2",
+    "trap_z",
+    "para_x",
+    "para_y",
+    "para_z",
+    "para_alpha",
+    "para_theta",
+    "para_phi",
+    "torus_rtor",
+    "torus_rmax",
+    "ellipsoid_ax",
+    "ellipsoid_by",
+    "ellipsoid_cz",
+    "elltube_ax",
+    "elltube_by",
+    "elltube_hz",
+    "polyhedra_nsides",
     "tilt_x",
     "tilt_y",
     "bool_a_x",
@@ -185,6 +214,16 @@ def _text_single_sphere(rng: random.Random, p: Dict[str, float]) -> Tuple[str, L
     ]
 
 
+def _text_single_orb(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
+    parts = [
+        _part_with_span("child_rmax", _maybe_unit(rng, p["child_rmax"]), "rmax {value}"),
+    ]
+    text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
+    return "Single orb: " + text + ".", [
+        {"key": sp["key"], "start": sp["start"] + 12, "end": sp["end"] + 12} for sp in spans
+    ]
+
+
 def _text_single_cons(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
     parts = [
         _part_with_span("rmax1", _maybe_unit(rng, p["rmax1"]), "rmax1 {value}"),
@@ -234,6 +273,94 @@ def _text_single_cuttubs(rng: random.Random, p: Dict[str, float]) -> Tuple[str, 
         _part_with_span("child_hz", _maybe_unit(rng, p["child_hz"]), "hz {value}"),
         _part_with_span("tilt_x", _fmt_num(p["tilt_x"]), "tilt_x {value}"),
         _part_with_span("tilt_y", _fmt_num(p["tilt_y"]), "tilt_y {value}"),
+    ]
+    text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
+    return prefix + text + ".", [
+        {"key": sp["key"], "start": sp["start"] + len(prefix), "end": sp["end"] + len(prefix)} for sp in spans
+    ]
+
+
+def _text_single_trap(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
+    prefix = "Single trap: "
+    parts = [
+        _part_with_span("trap_x1", _maybe_unit(rng, p["trap_x1"]), "x1 {value}"),
+        _part_with_span("trap_x2", _maybe_unit(rng, p["trap_x2"]), "x2 {value}"),
+        _part_with_span("trap_x3", _maybe_unit(rng, p["trap_x3"]), "x3 {value}"),
+        _part_with_span("trap_x4", _maybe_unit(rng, p["trap_x4"]), "x4 {value}"),
+        _part_with_span("trap_y1", _maybe_unit(rng, p["trap_y1"]), "y1 {value}"),
+        _part_with_span("trap_y2", _maybe_unit(rng, p["trap_y2"]), "y2 {value}"),
+        _part_with_span("trap_z", _maybe_unit(rng, p["trap_z"]), "z {value}"),
+    ]
+    text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
+    return prefix + text + ".", [
+        {"key": sp["key"], "start": sp["start"] + len(prefix), "end": sp["end"] + len(prefix)} for sp in spans
+    ]
+
+
+def _text_single_para(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
+    prefix = "Single para: "
+    parts = [
+        _part_with_span("para_x", _maybe_unit(rng, p["para_x"]), "x {value}"),
+        _part_with_span("para_y", _maybe_unit(rng, p["para_y"]), "y {value}"),
+        _part_with_span("para_z", _maybe_unit(rng, p["para_z"]), "z {value}"),
+        _part_with_span("para_alpha", _fmt_num(p["para_alpha"]), "alpha {value}"),
+        _part_with_span("para_theta", _fmt_num(p["para_theta"]), "theta {value}"),
+        _part_with_span("para_phi", _fmt_num(p["para_phi"]), "phi {value}"),
+    ]
+    text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
+    return prefix + text + ".", [
+        {"key": sp["key"], "start": sp["start"] + len(prefix), "end": sp["end"] + len(prefix)} for sp in spans
+    ]
+
+
+def _text_single_torus(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
+    prefix = "Single torus: "
+    parts = [
+        _part_with_span("torus_rtor", _maybe_unit(rng, p["torus_rtor"]), "major radius {value}"),
+        _part_with_span("torus_rmax", _maybe_unit(rng, p["torus_rmax"]), "tube radius {value}"),
+    ]
+    text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
+    return prefix + text + ".", [
+        {"key": sp["key"], "start": sp["start"] + len(prefix), "end": sp["end"] + len(prefix)} for sp in spans
+    ]
+
+
+def _text_single_ellipsoid(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
+    prefix = "Single ellipsoid: "
+    parts = [
+        _part_with_span("ellipsoid_ax", _maybe_unit(rng, p["ellipsoid_ax"]), "ax {value}"),
+        _part_with_span("ellipsoid_by", _maybe_unit(rng, p["ellipsoid_by"]), "by {value}"),
+        _part_with_span("ellipsoid_cz", _maybe_unit(rng, p["ellipsoid_cz"]), "cz {value}"),
+    ]
+    text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
+    return prefix + text + ".", [
+        {"key": sp["key"], "start": sp["start"] + len(prefix), "end": sp["end"] + len(prefix)} for sp in spans
+    ]
+
+
+def _text_single_elltube(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
+    prefix = "Single elliptical tube: "
+    parts = [
+        _part_with_span("elltube_ax", _maybe_unit(rng, p["elltube_ax"]), "ax {value}"),
+        _part_with_span("elltube_by", _maybe_unit(rng, p["elltube_by"]), "by {value}"),
+        _part_with_span("elltube_hz", _maybe_unit(rng, p["elltube_hz"]), "hz {value}"),
+    ]
+    text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
+    return prefix + text + ".", [
+        {"key": sp["key"], "start": sp["start"] + len(prefix), "end": sp["end"] + len(prefix)} for sp in spans
+    ]
+
+
+def _text_single_polyhedra(rng: random.Random, p: Dict[str, float]) -> Tuple[str, List[Dict[str, object]]]:
+    prefix = "Single polyhedra: "
+    parts = [
+        _part_with_span("polyhedra_nsides", str(int(p["polyhedra_nsides"])), "nsides {value}"),
+        _part_with_span("z1", _maybe_unit(rng, p["z1"]), "z1 {value}"),
+        _part_with_span("z2", _maybe_unit(rng, p["z2"]), "z2 {value}"),
+        _part_with_span("z3", _maybe_unit(rng, p["z3"]), "z3 {value}"),
+        _part_with_span("r1", _maybe_unit(rng, p["r1"]), "r1 {value}"),
+        _part_with_span("r2", _maybe_unit(rng, p["r2"]), "r2 {value}"),
+        _part_with_span("r3", _maybe_unit(rng, p["r3"]), "r3 {value}"),
     ]
     text, spans = _assemble_parts([(t, [sp]) for t, sp in parts], ", ")
     return prefix + text + ".", [
@@ -383,10 +510,17 @@ def generate_samples(n: int, seed: int) -> List[Dict[str, object]]:
         ("single_box", sample_single_box, _text_single_box),
         ("single_tubs", sample_single_tubs, _text_single_tubs),
         ("single_sphere", sample_single_sphere, _text_single_sphere),
+        ("single_orb", sample_single_orb, _text_single_orb),
         ("single_cons", sample_single_cons, _text_single_cons),
         ("single_trd", sample_single_trd, _text_single_trd),
         ("single_polycone", sample_single_polycone, _text_single_polycone),
         ("single_cuttubs", sample_single_cuttubs, _text_single_cuttubs),
+        ("single_trap", sample_single_trap, _text_single_trap),
+        ("single_para", sample_single_para, _text_single_para),
+        ("single_torus", sample_single_torus, _text_single_torus),
+        ("single_ellipsoid", sample_single_ellipsoid, _text_single_ellipsoid),
+        ("single_elltube", sample_single_elltube, _text_single_elltube),
+        ("single_polyhedra", sample_single_polyhedra, _text_single_polyhedra),
         ("boolean", sample_boolean_boxes, _text_boolean),
     ]
 

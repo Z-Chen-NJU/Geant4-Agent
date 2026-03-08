@@ -5,6 +5,8 @@ import re
 from core.orchestrator.types import CandidateUpdate, Intent, Producer, UpdateOp
 from nlu.runtime_semantic import extract_runtime_semantic_frame
 
+_GRAPH_STRUCTURES = {"ring", "grid", "nest", "stack", "shell", "boolean"}
+
 
 def _parse_energy_mev(text: str) -> float | None:
     m = re.search(r"([-+]?\d*\.?\d+)\s*(mev|gev|kev)", text.lower())
@@ -31,9 +33,10 @@ def _value_to_mm(value: float, unit: str) -> float:
 def _parse_module_triplet_mm(text: str) -> tuple[float, float, float] | None:
     num = r"[-+]?\d*\.?\d+"
     unit = r"(mm|cm|m)"
+    sep = r"(?:x|X|\*|by)"
     pat1 = (
-        rf"({num})\s*{unit}\s*[xX*]\s*"
-        rf"({num})\s*{unit}\s*[xX*]\s*"
+        rf"({num})\s*{unit}\s*{sep}\s*"
+        rf"({num})\s*{unit}\s*{sep}\s*"
         rf"({num})\s*{unit}"
     )
     m = re.search(pat1, text)
@@ -43,7 +46,7 @@ def _parse_module_triplet_mm(text: str) -> tuple[float, float, float] | None:
         z = _value_to_mm(float(m.group(5)), m.group(6))
         return x, y, z
 
-    pat2 = rf"({num})\s*[xX*]\s*({num})\s*[xX*]\s*({num})\s*{unit}"
+    pat2 = rf"({num})\s*{sep}\s*({num})\s*{sep}\s*({num})\s*{unit}"
     m2 = re.search(pat2, text)
     if not m2:
         return None
@@ -70,6 +73,36 @@ def _infer_structure_from_text(text: str) -> str | None:
     if any(
         k in low
         for k in [
+            "union",
+            "subtraction",
+            "intersection",
+            "boolean",
+            "subtract",
+            "minus",
+            "difference",
+            "hole",
+            "cut out",
+            "cutout",
+            "\u51cf\u53bb",
+            "\u5dee\u96c6",
+            "\u6316\u7a7a",
+            "\u5f00\u5b54",
+        ]
+    ):
+        return "boolean"
+    if any(k in low for k in ["ring", "annulus", "circular", "\u73af", "\u73af\u5f62", "\u5706\u73af"]):
+        return "ring"
+    if any(k in low for k in ["grid", "array", "matrix", "\u9635\u5217", "\u4e8c\u7ef4\u9635\u5217", "\u63a2\u6d4b\u677f"]):
+        return "grid"
+    if any(k in low for k in ["stack", "stacked", "layer", "layers", "sandwich", "\u5806\u53e0", "\u5939\u5c42", "\u5c42"]):
+        return "stack"
+    if any(k in low for k in ["shell", "concentric", "coaxial", "\u58f3", "\u540c\u5fc3", "\u5c4f\u853d\u58f3"]):
+        return "shell"
+    if any(k in low for k in ["nest", "inside", "contains", "\u5d4c\u5957", "\u5185\u5d4c", "\u5916\u76d2", "\u76d2\u5b50\u91cc"]):
+        return "nest"
+    if any(
+        k in low
+        for k in [
             "box",
             "cube",
             "\u7acb\u65b9\u4f53",
@@ -79,6 +112,8 @@ def _infer_structure_from_text(text: str) -> str | None:
         return "single_box"
     if any(k in low for k in ["cylinder", "tubs", "\u5706\u67f1"]):
         return "single_tubs"
+    if re.search(r"(?<![a-z0-9_])orb(?![a-z0-9_])", low):
+        return "single_orb"
     if any(k in low for k in ["sphere", "\u7403"]):
         return "single_sphere"
     return None
@@ -99,12 +134,26 @@ def _infer_particle(text: str) -> str | None:
 
 def _infer_material(text: str) -> str | None:
     low = text.lower()
+    if "g4_air" in low or "air" in low or "\u7a7a\u6c14" in low:
+        return "G4_AIR"
+    if "g4_cesium_iodide" in low or "g4_cesium-iodide" in low or "g4_csi" in low or "cesium iodide" in low or "caesium iodide" in low or "csi" in low:
+        return "G4_CESIUM_IODIDE"
+    if "g4_pb" in low or "lead" in low or "\u94c5" in low:
+        return "G4_Pb"
+    if "g4_stainless-steel" in low or "g4_stainless_steel" in low or "stainless steel" in low or "steel" in low or "\u94a2" in low:
+        return "G4_STAINLESS-STEEL"
+    if "g4_fe" in low or "iron" in low or "\u94c1" in low:
+        return "G4_Fe"
+    if "g4_w" in low or "tungsten" in low or "\u94a8" in low:
+        return "G4_W"
     if "g4_cu" in low or "copper" in low or "\u94dc" in low:
         return "G4_Cu"
     if "g4_si" in low or "silicon" in low or "\u7845" in low:
         return "G4_Si"
     if "g4_al" in low or "aluminum" in low or "aluminium" in low or "\u94dd" in low:
         return "G4_Al"
+    if "concrete" in low or "\u6df7\u51dd\u571f" in low:
+        return "G4_CONCRETE"
     if "g4_water" in low or "water" in low or "\u6c34" in low:
         return "G4_WATER"
     return None
@@ -128,7 +177,7 @@ def _infer_source_type(text: str) -> str | None:
 
     if any(k in low for k in ["isotropic", "\u5404\u5411\u540c\u6027"]):
         return "isotropic"
-    if any(_contains_word(k) for k in ["beam"]) or any(k in low for k in ["\u675f\u6d41", "\u7c92\u5b50\u675f"]):
+    if any(_contains_word(k) for k in ["beam", "pencil beam", "collimated"]) or any(k in low for k in ["\u675f\u6d41", "\u7c92\u5b50\u675f", "\u51c6\u76f4"]):
         return "beam"
     if any(_contains_word(k) for k in ["plane source", "plane"]) or "\u9762\u6e90" in text:
         return "plane"
@@ -207,17 +256,21 @@ def extract_candidates_from_normalized_text(
     min_confidence: float,
     context_summary: str,
     config_path: str,
+    apply_autofix: bool = False,
 ) -> tuple[CandidateUpdate, dict]:
     _ = config_path
     frame, debug = extract_runtime_semantic_frame(
-        normalized_text,
+        (raw_text or "").strip() or normalized_text,
+        normalized_text=normalized_text,
         min_confidence=min_confidence,
         device="auto",
         context_summary=context_summary,
+        apply_autofix=apply_autofix,
     )
     updates: list[UpdateOp] = []
     score = float(debug.get("scores", {}).get("best_prob", 0.6))
     merged_text = f"{raw_text} ; {normalized_text}".strip(" ;")
+    resolved_structure = str(frame.geometry.structure or "")
 
     if frame.geometry.structure:
         updates.append(
@@ -225,6 +278,28 @@ def extract_candidates_from_normalized_text(
                 path="geometry.structure",
                 op="set",
                 value=frame.geometry.structure,
+                producer=Producer.BERT_EXTRACTOR,
+                confidence=score,
+                turn_id=turn_id,
+            )
+        )
+    if frame.geometry.chosen_skeleton:
+        updates.append(
+            UpdateOp(
+                path="geometry.chosen_skeleton",
+                op="set",
+                value=frame.geometry.chosen_skeleton,
+                producer=Producer.BERT_EXTRACTOR,
+                confidence=score,
+                turn_id=turn_id,
+            )
+        )
+    if isinstance(frame.geometry.graph_program, dict) and frame.geometry.graph_program:
+        updates.append(
+            UpdateOp(
+                path="geometry.graph_program",
+                op="set",
+                value=dict(frame.geometry.graph_program),
                 producer=Producer.BERT_EXTRACTOR,
                 confidence=score,
                 turn_id=turn_id,
@@ -243,6 +318,34 @@ def extract_candidates_from_normalized_text(
         )
 
     if not frame.geometry.structure:
+        graph_choice = debug.get("graph_choice", {})
+        graph_structure = str(graph_choice.get("structure", "") or "")
+        graph_skeleton = str(graph_choice.get("chosen_skeleton", "") or "")
+        if graph_structure and graph_structure != "unknown":
+            updates.append(
+                UpdateOp(
+                    path="geometry.structure",
+                    op="set",
+                    value=graph_structure,
+                    producer=Producer.BERT_EXTRACTOR,
+                    confidence=score,
+                    turn_id=turn_id,
+                )
+            )
+        if graph_skeleton:
+            updates.append(
+                UpdateOp(
+                    path="geometry.chosen_skeleton",
+                    op="set",
+                    value=graph_skeleton,
+                    producer=Producer.BERT_EXTRACTOR,
+                    confidence=score,
+                    turn_id=turn_id,
+                )
+            )
+        if not resolved_structure and graph_structure:
+            resolved_structure = graph_structure
+    if not frame.geometry.structure:
         inferred_structure = _infer_structure_from_text(merged_text)
         if inferred_structure:
             updates.append(
@@ -255,77 +358,79 @@ def extract_candidates_from_normalized_text(
                     turn_id=turn_id,
                 )
             )
-    triplet = _parse_module_triplet_mm(merged_text)
-    if triplet is not None:
-        updates.extend(
+            resolved_structure = inferred_structure
+    if resolved_structure not in _GRAPH_STRUCTURES:
+        triplet = _parse_module_triplet_mm(merged_text)
+        if triplet is not None:
+            updates.extend(
+                [
+                    UpdateOp(
+                        path="geometry.params.module_x",
+                        op="set",
+                        value=float(triplet[0]),
+                        producer=Producer.BERT_EXTRACTOR,
+                        confidence=score,
+                        turn_id=turn_id,
+                    ),
+                    UpdateOp(
+                        path="geometry.params.module_y",
+                        op="set",
+                        value=float(triplet[1]),
+                        producer=Producer.BERT_EXTRACTOR,
+                        confidence=score,
+                        turn_id=turn_id,
+                    ),
+                    UpdateOp(
+                        path="geometry.params.module_z",
+                        op="set",
+                        value=float(triplet[2]),
+                        producer=Producer.BERT_EXTRACTOR,
+                        confidence=score,
+                        turn_id=turn_id,
+                    ),
+                ]
+            )
+        radius = _parse_named_length_mm(
+            merged_text,
             [
-                UpdateOp(
-                    path="geometry.params.module_x",
-                    op="set",
-                    value=float(triplet[0]),
-                    producer=Producer.BERT_EXTRACTOR,
-                    confidence=score,
-                    turn_id=turn_id,
-                ),
-                UpdateOp(
-                    path="geometry.params.module_y",
-                    op="set",
-                    value=float(triplet[1]),
-                    producer=Producer.BERT_EXTRACTOR,
-                    confidence=score,
-                    turn_id=turn_id,
-                ),
-                UpdateOp(
-                    path="geometry.params.module_z",
-                    op="set",
-                    value=float(triplet[2]),
-                    producer=Producer.BERT_EXTRACTOR,
-                    confidence=score,
-                    turn_id=turn_id,
-                ),
-            ]
+                "radius",
+                "rmax",
+                "\u534a\u5f84",
+            ],
         )
-    radius = _parse_named_length_mm(
-        merged_text,
-        [
-            "radius",
-            "rmax",
-            "\u534a\u5f84",
-        ],
-    )
-    if radius is not None:
-        updates.append(
-            UpdateOp(
-                path="geometry.params.child_rmax",
-                op="set",
-                value=float(radius),
-                producer=Producer.BERT_EXTRACTOR,
-                confidence=score,
-                turn_id=turn_id,
+        if radius is not None:
+            updates.append(
+                UpdateOp(
+                    path="geometry.params.child_rmax",
+                    op="set",
+                    value=float(radius),
+                    producer=Producer.BERT_EXTRACTOR,
+                    confidence=score,
+                    turn_id=turn_id,
+                )
             )
+        half_len = _parse_named_length_mm(
+            merged_text,
+            [
+                "half-length",
+                "half length",
+                "half_len",
+                "half_l",
+                "\u534a\u957f",
+                "\u534a\u9ad8",
+            ],
         )
-    half_len = _parse_named_length_mm(
-        merged_text,
-        [
-            "half-length",
-            "half length",
-            "half_len",
-            "half_l",
-            "\u534a\u957f",
-            "\u534a\u9ad8",
-        ],
-    )
-    if half_len is not None:
-        updates.append(
-            UpdateOp(
-                path="geometry.params.child_hz",
-                op="set",
-                value=float(half_len),
-                producer=Producer.BERT_EXTRACTOR,
-                confidence=score,
-                turn_id=turn_id,
+        if half_len is not None:
+            updates.append(
+                UpdateOp(
+                    path="geometry.params.child_hz",
+                    op="set",
+                    value=float(half_len),
+                    producer=Producer.BERT_EXTRACTOR,
+                    confidence=score,
+                    turn_id=turn_id,
+                )
             )
-        )
 
     if frame.materials.selected_materials:
         updates.append(

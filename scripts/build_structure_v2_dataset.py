@@ -114,6 +114,7 @@ def _dedup(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build structure dataset v2 focused on LLM-normalized text styles.")
     parser.add_argument("--base", default="nlu/bert_lab/data/controlled_structure.jsonl")
+    parser.add_argument("--extra", nargs="*", default=[], help="Optional extra jsonl sources, e.g. controlled_multitask.")
     parser.add_argument("--out", default="nlu/bert_lab/data/controlled_structure_v2.jsonl")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--keep_original", action="store_true")
@@ -125,6 +126,10 @@ def main() -> None:
 
     rng = random.Random(args.seed)
     base_rows = _load_jsonl(base_path)
+    extra_paths = [Path(p) for p in args.extra if p]
+    for extra_path in extra_paths:
+        if extra_path.exists():
+            base_rows.extend(_load_jsonl(extra_path))
     generated: list[dict[str, Any]] = []
 
     for row in base_rows:
@@ -171,6 +176,7 @@ def main() -> None:
     style_counts = Counter(str(x.get("style", "")) for x in generated)
     summary = {
         "base_path": str(base_path),
+        "extra_paths": [str(path) for path in extra_paths if path.exists()],
         "out_path": str(out_path),
         "seed": args.seed,
         "keep_original": bool(args.keep_original),

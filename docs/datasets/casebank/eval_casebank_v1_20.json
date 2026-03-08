@@ -1,0 +1,260 @@
+{
+  "schema_version": "v1",
+  "dataset_name": "initial_prompt_casebank_20",
+  "description": "Fixed initial-prompt evaluation set for dialogue readiness regression. Balanced by style and parameter completeness.",
+  "balance": {
+    "total": 20,
+    "style": {
+      "precise": 10,
+      "fuzzy": 10
+    },
+    "completeness": {
+      "full": 10,
+      "missing": 10
+    },
+    "cross_matrix": {
+      "precise_full": 5,
+      "precise_missing": 5,
+      "fuzzy_full": 5,
+      "fuzzy_missing": 5
+    }
+  },
+  "cases": [
+    {
+      "id": "PF01",
+      "domain": "medical",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "prompt": "请配置一个 300 mm x 300 mm x 300 mm 的水立方体靶体，点源 gamma，能量 0.662 MeV，位置 (0,0,-50) mm，方向 +z，物理列表 QBBC，输出格式 root。",
+      "intentionally_missing": []
+    },
+    {
+      "id": "PF02",
+      "domain": "aerospace",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "en",
+      "prompt": "Set up a 50 mm x 50 mm x 5 mm silicon box detector, proton beam source at 100 MeV from position (0,0,-100) mm toward +z, physics list FTFP_BERT, output json.",
+      "intentionally_missing": []
+    },
+    {
+      "id": "PF03",
+      "domain": "industrial_ndt",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "prompt": "建立一个钢制圆柱体目标：半径 40 mm、半长 100 mm，源类型 beam，粒子 gamma，能量 2 MeV，位置 (0,0,-300) mm，方向 +z，物理列表 Shielding，输出 csv。",
+      "intentionally_missing": []
+    },
+    {
+      "id": "PF04",
+      "domain": "high_energy_physics",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "en",
+      "prompt": "Create a lead sphere target with radius 80 mm, electron point source at 5 MeV from (0,0,-200) mm along +z, use FTFP_BERT, and save output as hdf5.",
+      "intentionally_missing": []
+    },
+    {
+      "id": "PF05",
+      "domain": "nuclear_engineering",
+      "style": "precise",
+      "completeness": "full",
+      "lang": "zh",
+      "prompt": "请设置 200 mm x 200 mm x 200 mm 的铝立方体靶，source.type 设为 isotropic，粒子 neutron，能量 14 MeV，位置 (0,0,0) mm，物理列表 QGSP_BERT_HP，输出 xml。",
+      "intentionally_missing": []
+    },
+    {
+      "id": "PM01",
+      "domain": "medical",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "我需要一个 300 mm 见方的水模体，几何先按立方体处理。",
+      "intentionally_missing": [
+        "source.*",
+        "physics.physics_list",
+        "output.*"
+      ]
+    },
+    {
+      "id": "PM02",
+      "domain": "aerospace",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "en",
+      "prompt": "Use a proton beam at 100 MeV from (0,0,-100) mm to +z, physics FTFP_BERT, output root.",
+      "intentionally_missing": [
+        "geometry.*",
+        "materials.*"
+      ]
+    },
+    {
+      "id": "PM03",
+      "domain": "industrial_ndt",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "目标用圆柱体，半径 40 mm，半长 80 mm；gamma 点源 1 MeV，位于 (0,0,-200) mm，方向 +z。",
+      "intentionally_missing": [
+        "materials.*",
+        "physics.physics_list",
+        "output.*"
+      ]
+    },
+    {
+      "id": "PM04",
+      "domain": "high_energy_physics",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "en",
+      "prompt": "Single box geometry, copper target, gamma particle source.",
+      "intentionally_missing": [
+        "geometry.params.*",
+        "source.energy",
+        "source.position",
+        "source.direction",
+        "physics.physics_list",
+        "output.*"
+      ]
+    },
+    {
+      "id": "PM05",
+      "domain": "environmental_radiation",
+      "style": "precise",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "材料先用空气，物理过程先选 QBBC，输出格式 json。",
+      "intentionally_missing": [
+        "geometry.*",
+        "source.*",
+        "output.path"
+      ]
+    },
+    {
+      "id": "FF01",
+      "domain": "medical",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "prompt": "I want a quick radiotherapy sanity run: think of a water phantom about 30 cm each side, with a forward gamma beam around 6 MeV launched from upstream at (0,0,-400) mm toward +z. Use QBBC and write a root output.",
+      "intentionally_missing": []
+    },
+    {
+      "id": "FF02",
+      "domain": "aerospace",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "zh",
+      "prompt": "做一个航天电子抗辐照初筛：把硅器件简化成 50x50x5 mm 的小方块，用 100 MeV 质子束从上游 (0,0,-100) mm 打过来，沿 +z，物理列表用 FTFP_BERT，结果导出成 json。",
+      "intentionally_missing": []
+    },
+    {
+      "id": "FF03",
+      "domain": "security_screening",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "prompt": "For a cargo scanning toy setup, model a steel cylinder target (radius 60 mm, half-length 120 mm) and send a 3 MeV photon beam from (0,0,-500) mm along +z. Pick Shielding and store output as csv.",
+      "intentionally_missing": []
+    },
+    {
+      "id": "FF04",
+      "domain": "education",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "zh",
+      "prompt": "教学演示用：想让同学看 gamma 在铜中的衰减，把铜块设成 100 mm x 100 mm x 100 mm，点源 1 MeV 放在 (0,0,-200) mm，朝 +z 发射，物理过程选 FTFP_BERT，输出 root。",
+      "intentionally_missing": []
+    },
+    {
+      "id": "FF05",
+      "domain": "semiconductor",
+      "style": "fuzzy",
+      "completeness": "full",
+      "lang": "en",
+      "prompt": "Use a silicon box chip proxy of 20 mm x 20 mm x 1 mm, isotropic neutron source at 2 MeV centered at (0,0,0) mm, physics list QGSP_BERT_HP, output xml for post-check.",
+      "intentionally_missing": []
+    },
+    {
+      "id": "FM01",
+      "domain": "medical",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "想先做个放疗前的粗略测试，几何先按常见水模体来就行，后面我们再细化。",
+      "intentionally_missing": [
+        "geometry.params.*",
+        "source.*",
+        "physics.physics_list",
+        "output.*"
+      ]
+    },
+    {
+      "id": "FM02",
+      "domain": "aerospace",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "prompt": "I need a first-pass space radiation setup for electronics, probably proton-dominated, and we can keep geometry simple for now.",
+      "intentionally_missing": [
+        "geometry.params.*",
+        "materials.*",
+        "source.energy",
+        "source.position",
+        "source.direction",
+        "physics.physics_list",
+        "output.*"
+      ]
+    },
+    {
+      "id": "FM03",
+      "domain": "nuclear_engineering",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "我们想看中子在材料里的响应，先建一个简单目标体和中子源，参数你先按工程常见值建议。",
+      "intentionally_missing": [
+        "geometry.*",
+        "materials.*",
+        "source.energy",
+        "source.position",
+        "source.direction",
+        "physics.physics_list",
+        "output.*"
+      ]
+    },
+    {
+      "id": "FM04",
+      "domain": "industrial_ndt",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "en",
+      "prompt": "For an NDT trial, I just want a compact target and a forward gamma source to see penetration trend.",
+      "intentionally_missing": [
+        "geometry.params.*",
+        "materials.*",
+        "source.energy",
+        "source.position",
+        "physics.physics_list",
+        "output.*"
+      ]
+    },
+    {
+      "id": "FM05",
+      "domain": "space_weather",
+      "style": "fuzzy",
+      "completeness": "missing",
+      "lang": "zh",
+      "prompt": "先做一个空间天气粒子打到探测器的示意仿真，重点是流程跑通，细节参数后续再补。",
+      "intentionally_missing": [
+        "geometry.*",
+        "materials.*",
+        "source.*",
+        "physics.physics_list",
+        "output.*"
+      ]
+    }
+  ]
+}

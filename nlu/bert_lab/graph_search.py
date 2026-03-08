@@ -18,6 +18,7 @@ SKELETON_SUMMARY: Dict[str, str] = {
     "single_box": "single_box",
     "single_tubs": "single_tubs",
     "single_sphere": "single_sphere",
+    "single_orb": "single_orb",
     "single_cons": "single_cons",
     "single_trd": "single_trd",
     "single_polycone": "single_polycone",
@@ -37,6 +38,7 @@ KEYWORD_CUES: Dict[str, Tuple[str, ...]] = {
     "single_box": ("single_box", "box", "cube", "cuboid"),
     "single_tubs": ("single_tubs", "tubs", "cylinder", "tube"),
     "single_sphere": ("single_sphere", "sphere", "ball"),
+    "single_orb": ("single_orb", "orb"),
     "single_cons": ("single_cons", "cons", "cone", "frustum"),
     "single_trd": ("single_trd", "trd", "trapezoid", "trapezoidal"),
     "single_polycone": ("single_polycone", "polycone", "z planes"),
@@ -95,7 +97,7 @@ def _cue_score(text: str, structure: str) -> float:
 
 def _explicit_structure_hint(text: str) -> str:
     m = re.search(
-        r"(?:^|[;\s])structure\s*[:=]\s*(ring|grid|nest|stack|shell|single_box|single_tubs|single_sphere|single_cons|single_trd|single_polycone|single_cuttubs|boolean)\b",
+        r"(?:^|[;\s])structure\s*[:=]\s*(ring|grid|nest|stack|shell|single_box|single_tubs|single_sphere|single_orb|single_cons|single_trd|single_polycone|single_cuttubs|boolean)\b",
         text,
         flags=re.IGNORECASE,
     )
@@ -179,6 +181,7 @@ def search_candidate_graphs(
         "single_box",
         "single_tubs",
         "single_sphere",
+        "single_orb",
         "single_cons",
         "single_trd",
         "single_polycone",

@@ -99,6 +99,29 @@ TRIPLET_PARAM_ALIASES = {
     "element_dimensions",
 }
 
+BOOLEAN_TOKENS = (
+    "boolean",
+    "union",
+    "subtraction",
+    "intersection",
+    "subtract",
+    "intersect",
+    "minus",
+    "difference",
+    "cut out",
+    "cutout",
+    "hole",
+    "减去",
+    "差集",
+    "挖空",
+    "开孔",
+    "打孔",
+)
+
+GRID_TOKENS = ("grid", "array", "matrix", "阵列", "二维阵列", "探测板")
+NEST_TOKENS = ("nest", "inside", "contains", "嵌套", "内嵌", "外盒", "盒子里")
+SHELL_TOKENS = ("shell", "concentric", "coaxial", "壳", "同心")
+
 
 def _normalize_key(key: str) -> str:
     return key.strip().lower().replace("-", "_").replace(" ", "_")
@@ -131,9 +154,10 @@ def _first_match(pattern: str, text: str) -> float | None:
 
 def _module_triplet(text: str) -> Tuple[float, float, float] | None:
     unit = r"(?:mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)"
+    sep = r"(?:x|X|\*|by)"
     m = re.search(
-        rf"(\d*\.?\d+\s*{unit})\s*(?:x|X|\*)\s*"
-        rf"(\d*\.?\d+\s*{unit})\s*(?:x|X|\*)\s*"
+        rf"(\d*\.?\d+\s*{unit})\s*{sep}\s*"
+        rf"(\d*\.?\d+\s*{unit})\s*{sep}\s*"
         rf"(\d*\.?\d+\s*{unit})",
         text,
         flags=re.IGNORECASE,
@@ -146,7 +170,7 @@ def _module_triplet(text: str) -> Tuple[float, float, float] | None:
     z = _parse_value_with_unit(m.group(3))
     if x is None or y is None or z is None:
         m2 = re.search(
-            rf"(\d*\.?\d+)\s*(?:x|X|\*)\s*(\d*\.?\d+)\s*(?:x|X|\*)\s*(\d*\.?\d+)\s*({unit})",
+            rf"(\d*\.?\d+)\s*{sep}\s*(\d*\.?\d+)\s*{sep}\s*(\d*\.?\d+)\s*({unit})",
             text,
             flags=re.IGNORECASE,
         )
@@ -161,24 +185,25 @@ def _module_triplet(text: str) -> Tuple[float, float, float] | None:
     return x, y, z
 
 
-def _all_triplets(text: str) -> List[Tuple[float, float, float]]:
+def _all_triplet_matches(text: str) -> List[Tuple[int, int, Tuple[float, float, float]]]:
     unit = r"(?:mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)"
+    sep = r"(?:x|X|\*|by)"
     pattern = re.compile(
-        rf"(\d*\.?\d+\s*{unit})\s*(?:x|X|\*)\s*"
-        rf"(\d*\.?\d+\s*{unit})\s*(?:x|X|\*)\s*"
+        rf"(\d*\.?\d+\s*{unit})\s*{sep}\s*"
+        rf"(\d*\.?\d+\s*{unit})\s*{sep}\s*"
         rf"(\d*\.?\d+\s*{unit})",
         flags=re.IGNORECASE,
     )
-    out: List[Tuple[float, float, float]] = []
+    out: List[Tuple[int, int, Tuple[float, float, float]]] = []
     for m in pattern.finditer(text):
         x = _parse_value_with_unit(m.group(1))
         y = _parse_value_with_unit(m.group(2))
         z = _parse_value_with_unit(m.group(3))
         if x is None or y is None or z is None:
             continue
-        out.append((x, y, z))
+        out.append((m.start(), m.end(), (x, y, z)))
     compact = re.compile(
-        rf"(\d*\.?\d+)\s*(?:x|X|\*)\s*(\d*\.?\d+)\s*(?:x|X|\*)\s*(\d*\.?\d+)\s*({unit})",
+        rf"(\d*\.?\d+)\s*{sep}\s*(\d*\.?\d+)\s*{sep}\s*(\d*\.?\d+)\s*({unit})",
         flags=re.IGNORECASE,
     )
     for m in compact.finditer(text):
@@ -188,8 +213,30 @@ def _all_triplets(text: str) -> List[Tuple[float, float, float]]:
         z = _parse_value_with_unit(f"{m.group(3)} {suffix}")
         if x is None or y is None or z is None:
             continue
-        out.append((x, y, z))
+        out.append((m.start(), m.end(), (x, y, z)))
     return out
+
+
+def _all_triplets(text: str) -> List[Tuple[float, float, float]]:
+    return [item[2] for item in _all_triplet_matches(text)]
+
+
+def _ordered_boolean_triplets(text: str) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]] | None:
+    matches = _all_triplet_matches(text)
+    if len(matches) < 2:
+        return None
+    low = text.lower()
+    from_index = low.find(" from ")
+    if ("subtract" in low or "减去" in low) and from_index >= 0:
+        before_from = [triplet for start, end, triplet in matches if end <= from_index]
+        after_from = [triplet for start, end, triplet in matches if start >= from_index]
+        if before_from and after_from:
+            return after_from[0], before_from[0]
+    if "hole" in low or "cut out" in low or "cutout" in low or "挖空" in low or "开孔" in low or "打孔" in low:
+        return matches[0][2], matches[1][2]
+    if "minus" in low or "difference" in low or "差集" in low:
+        return matches[0][2], matches[1][2]
+    return matches[0][2], matches[1][2]
 
 
 def _cube_edge(text: str) -> float | None:
@@ -263,6 +310,26 @@ def _apply_alias_key_values(text: str, out: Dict[str, float], notes: List[str]) 
         _apply_numeric_value(out, target, value, notes, f"alias key {raw_key}")
 
 
+def _is_boolean_context(text: str) -> bool:
+    low = text.lower()
+    return any(token in low for token in BOOLEAN_TOKENS)
+
+
+def _is_grid_context(text: str) -> bool:
+    low = text.lower()
+    return any(token in low for token in GRID_TOKENS)
+
+
+def _is_nest_context(text: str) -> bool:
+    low = text.lower()
+    return any(token in low for token in NEST_TOKENS)
+
+
+def _is_shell_context(text: str) -> bool:
+    low = text.lower()
+    return any(token in low for token in SHELL_TOKENS)
+
+
 def _fill_by_patterns(text: str, out: Dict[str, float], notes: List[str]) -> None:
     unit = r"(?:mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)?"
     num = r"[+\-]?\d*\.?\d+"
@@ -328,13 +395,236 @@ def _fill_by_patterns(text: str, out: Dict[str, float], notes: List[str]) -> Non
             notes.append("filled n from modules count")
 
 
+def _fill_stack_params(text: str, out: Dict[str, float], notes: List[str]) -> None:
+    text_l = text.lower()
+    stack_context = any(token in text_l for token in ("stack", "layer", "layers", "along z"))
+    if not stack_context:
+        return
+
+    unit = r"(?:mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)?"
+    num = r"[+\-]?\d*\.?\d+"
+    sep = r"(?:x|X|\*|by)"
+
+    if "stack_x" not in out or "stack_y" not in out:
+        footprint_patterns = [
+            rf"(?:footprint|stack(?:ed)?\s*layers?[^,;]*?footprint)\s*[:=]?\s*({num}\s*{unit})\s*{sep}\s*({num}\s*{unit})",
+            rf"(?:\u5e95\u9762|占地|层面尺寸)\s*[:=]?\s*({num}\s*{unit})\s*{sep}\s*({num}\s*{unit})",
+        ]
+        for pattern in footprint_patterns:
+            m = re.search(pattern, text, flags=re.IGNORECASE)
+            if not m:
+                continue
+            x_val = _parse_value_with_unit(m.group(1))
+            y_val = _parse_value_with_unit(m.group(2))
+            if x_val is None or y_val is None:
+                continue
+            if "stack_x" not in out:
+                out["stack_x"] = float(x_val)
+                notes.append("filled stack_x from stack footprint")
+            if "stack_y" not in out:
+                out["stack_y"] = float(y_val)
+                notes.append("filled stack_y from stack footprint")
+            break
+
+    if "stack_x" not in out:
+        val = _first_match(rf"(?:^|[\s,;(])x\s*[:=]?\s*({num}\s*{unit})", text)
+        if val is not None:
+            out["stack_x"] = float(val)
+            notes.append("filled stack_x from stack x")
+    if "stack_y" not in out:
+        val = _first_match(rf"(?:^|[\s,;(])y\s*[:=]?\s*({num}\s*{unit})", text)
+        if val is not None:
+            out["stack_y"] = float(val)
+            notes.append("filled stack_y from stack y")
+
+    if "stack_clearance" not in out:
+        val = _first_match(rf"(?:stack[_\s-]*)?clearance\s*[:=]?\s*({num}\s*{unit})", text)
+        if val is not None:
+            out["stack_clearance"] = float(val)
+            notes.append("filled stack_clearance from stack clearance")
+
+    container_clearance = _first_match(
+        rf"(?:container|outer(?:\s*box)?|nest(?:ed)?)\s*clearance\s*[:=]?\s*({num}\s*{unit})",
+        text,
+    )
+    if container_clearance is not None:
+        out["nest_clearance"] = float(container_clearance)
+        notes.append("filled nest_clearance from container clearance")
+    elif "nest_clearance" not in out and "stack_clearance" in out:
+        out["nest_clearance"] = float(out["stack_clearance"])
+        notes.append("filled nest_clearance from stack_clearance")
+
+    if all(k in out for k in ("t1", "t2", "t3")):
+        pass
+    else:
+        thickness_patterns = [
+            rf"thickness(?:es)?\s*[:=]?\s*({num}\s*{unit})\s*(?:and|,|/|;)\s*({num}\s*{unit})\s*(?:and|,|/|;)\s*({num}\s*{unit})",
+            rf"layers?\s*[:=]?\s*({num}\s*{unit})\s*(?:and|,|/|;)\s*({num}\s*{unit})\s*(?:and|,|/|;)\s*({num}\s*{unit})",
+            rf"thickness(?:es)?\s*[:=]?\s*({num})[\s,;/]+({num})[\s,;/]+({num})\s*({unit})",
+            rf"layers?\s*[:=]?\s*({num})[\s,;/]+({num})[\s,;/]+({num})\s*({unit})",
+        ]
+        for pattern in thickness_patterns:
+            m = re.search(pattern, text, flags=re.IGNORECASE)
+            if not m:
+                continue
+            if len(m.groups()) == 3:
+                values = (
+                    _parse_value_with_unit(m.group(1)),
+                    _parse_value_with_unit(m.group(2)),
+                    _parse_value_with_unit(m.group(3)),
+                )
+            else:
+                suffix = m.group(4).strip() or "mm"
+                values = (
+                    _parse_value_with_unit(f"{m.group(1)} {suffix}"),
+                    _parse_value_with_unit(f"{m.group(2)} {suffix}"),
+                    _parse_value_with_unit(f"{m.group(3)} {suffix}"),
+                )
+            if any(v is None for v in values):
+                continue
+            if "t1" not in out:
+                out["t1"] = float(values[0])
+                notes.append("filled t1 from stack thicknesses")
+            if "t2" not in out:
+                out["t2"] = float(values[1])
+                notes.append("filled t2 from stack thicknesses")
+            if "t3" not in out:
+                out["t3"] = float(values[2])
+                notes.append("filled t3 from stack thicknesses")
+            break
+
+    if not all(k in out for k in ("parent_x", "parent_y", "parent_z")):
+        outer_box_patterns = [
+            rf"(?:outer\s*box|container|parent)\s*[:=]?\s*({num}\s*{unit})\s*{sep}\s*({num}\s*{unit})\s*{sep}\s*({num}\s*{unit})",
+            rf"(?:\u5916\u76d2|容器)\s*[:=]?\s*({num}\s*{unit})\s*{sep}\s*({num}\s*{unit})\s*{sep}\s*({num}\s*{unit})",
+        ]
+        for pattern in outer_box_patterns:
+            m = re.search(pattern, text, flags=re.IGNORECASE)
+            if not m:
+                continue
+            values = [_parse_value_with_unit(m.group(idx)) for idx in range(1, 4)]
+            if any(v is None for v in values):
+                continue
+            if "parent_x" not in out:
+                out["parent_x"] = float(values[0])
+                notes.append("filled parent_x from outer box")
+            if "parent_y" not in out:
+                out["parent_y"] = float(values[1])
+                notes.append("filled parent_y from outer box")
+            if "parent_z" not in out:
+                out["parent_z"] = float(values[2])
+                notes.append("filled parent_z from outer box")
+            break
+
+
+def _fill_grid_params(text: str, out: Dict[str, float], notes: List[str]) -> None:
+    if not _is_grid_context(text):
+        return
+    if "nx" not in out or "ny" not in out:
+        patterns = [
+            r"\b(\d+)\s*(?:x|X|×|by)\s*(\d+)\b(?:[^;\n]{0,24})\b(?:grid|array|matrix)\b",
+            r"(\d+)\s*(?:x|X|×|by)\s*(\d+)\s*(?:盒体)?阵列",
+        ]
+        for pattern in patterns:
+            m = re.search(pattern, text, flags=re.IGNORECASE)
+            if not m:
+                continue
+            if "nx" not in out:
+                out["nx"] = int(m.group(1))
+                notes.append("filled nx from grid count")
+            if "ny" not in out:
+                out["ny"] = int(m.group(2))
+                notes.append("filled ny from grid count")
+            break
+
+
+def _fill_nest_shell_params(text: str, out: Dict[str, float], notes: List[str]) -> None:
+    unit = r"(?:mm|cm|m|\u6beb\u7c73|\u5398\u7c73|\u7c73)?"
+    num = r"[+\-]?\d*\.?\d+"
+    nest_context = _is_nest_context(text)
+    shell_context = _is_shell_context(text)
+
+    if nest_context and all(k in out for k in ("module_x", "module_y", "module_z")):
+        if "parent_x" not in out:
+            out["parent_x"] = float(out["module_x"])
+            notes.append("filled parent_x from outer box size")
+        if "parent_y" not in out:
+            out["parent_y"] = float(out["module_y"])
+            notes.append("filled parent_y from outer box size")
+        if "parent_z" not in out:
+            out["parent_z"] = float(out["module_z"])
+            notes.append("filled parent_z from outer box size")
+
+    if "child_rmax" not in out:
+        patterns = [
+            rf"(?:nested\s*core|core|child|cylinder)[^\n]*?(?:radius)\s*[:=]?\s*({num}\s*{unit})",
+            rf"(?:内嵌|圆柱|内核|核心)[^\n]*?(?:半径)\s*[:=]?\s*({num}\s*{unit})",
+        ]
+        for pattern in patterns:
+            val = _first_match(pattern, text)
+            if val is not None:
+                out["child_rmax"] = float(val)
+                notes.append("filled child_rmax from nested radius")
+                break
+
+    if "child_hz" not in out:
+        patterns = [
+            rf"(?:nested\s*core|core|child|cylinder)[^\n]*?(?:half[_\s-]*length|half[_\s-]*len|half[_\s-]*l)\s*[:=]?\s*({num}\s*{unit})",
+            rf"(?:内嵌|圆柱|内核|核心)[^\n]*?(?:半长|半高)\s*[:=]?\s*({num}\s*{unit})",
+        ]
+        for pattern in patterns:
+            val = _first_match(pattern, text)
+            if val is not None:
+                out["child_hz"] = float(val)
+                notes.append("filled child_hz from nested half length")
+                break
+
+    if shell_context and "inner_r" not in out:
+        val = _first_match(rf"(?:inner[_\s-]*radius|inner[_\s-]*r|内半径)\s*[:=]?\s*({num}\s*{unit})", text)
+        if val is not None:
+            out["inner_r"] = float(val)
+            notes.append("filled inner_r from shell inner radius")
+
+    if shell_context and "hz" not in out:
+        val = _first_match(rf"(?:half[_\s-]*length|half[_\s-]*len|half[_\s-]*l|半长|半高)\s*[:=]?\s*({num}\s*{unit})", text)
+        if val is not None:
+            out["hz"] = float(val)
+            notes.append("filled hz from shell half length")
+
+    if shell_context and not any(k in out for k in ("th1", "th2", "th3")):
+        thickness_patterns = [
+            rf"thickness(?:es)?\s*[:=]?\s*({num})\s*{unit}\s*(?:and|,|/)\s*({num})(?:\s*{unit})?(?:\s*(?:and|,|/)\s*({num})(?:\s*{unit})?)?",
+            rf"厚度\s*[:=]?\s*({num})\s*{unit}\s*(?:和|及|,|/)\s*({num})(?:\s*{unit})?(?:\s*(?:和|及|,|/)\s*({num})(?:\s*{unit})?)?",
+        ]
+        for pattern in thickness_patterns:
+            m = re.search(pattern, text, flags=re.IGNORECASE)
+            if not m:
+                continue
+            values = [m.group(1), m.group(2), m.group(3)]
+            for idx, raw in enumerate(values, start=1):
+                if not raw:
+                    continue
+                key = f"th{idx}"
+                if key in out:
+                    continue
+                parsed = _parse_value_with_unit(f"{raw} mm")
+                if parsed is None:
+                    continue
+                out[key] = float(parsed)
+                notes.append(f"filled {key} from shell thicknesses")
+            break
+
+
 def merge_params(text: str, params: Dict[str, float]) -> Tuple[Dict[str, float], List[str]]:
     notes: List[str] = []
     out = _canonicalize_input_params(params, notes)
     _apply_alias_key_values(text, out, notes)
     _fill_by_patterns(text, out, notes)
+    _fill_grid_params(text, out, notes)
+    _fill_stack_params(text, out, notes)
+    _fill_nest_shell_params(text, out, notes)
 
-    boolean_context = "boolean" in text.lower()
+    boolean_context = _is_boolean_context(text)
     if not boolean_context:
         triplet = _module_triplet(text)
         if triplet and not ("module_x" in out and "module_y" in out and "module_z" in out):
@@ -349,28 +639,28 @@ def merge_params(text: str, params: Dict[str, float]) -> Tuple[Dict[str, float],
                 out.setdefault("module_y", edge)
                 out.setdefault("module_z", edge)
                 notes.append("filled module_x/module_y/module_z from cube edge")
+        _fill_nest_shell_params(text, out, notes)
 
     if boolean_context or ("bool_a_x" in out or "bool_b_x" in out):
-        trips = _all_triplets(text)
-        if len(trips) >= 2:
-            a = trips[0]
-            b = trips[1]
+        ordered = _ordered_boolean_triplets(text)
+        if ordered is not None:
+            a, b = ordered
             if "bool_a_x" not in out:
                 out["bool_a_x"] = a[0]
                 out["bool_a_y"] = a[1]
                 out["bool_a_z"] = a[2]
-                notes.append("filled bool_a_* from first triplet")
+                notes.append("filled bool_a_* from boolean triplet order")
             if "bool_b_x" not in out:
                 out["bool_b_x"] = b[0]
                 out["bool_b_y"] = b[1]
                 out["bool_b_z"] = b[2]
-                notes.append("filled bool_b_* from second triplet")
+                notes.append("filled bool_b_* from boolean triplet order")
 
     for key, pattern in [
-        ("radius", r"\bradius\b\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
+        ("radius", r"(?:\bradius\b|半径)\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
         ("radius", r"\bR(?!\d)\b\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
-        ("clearance", r"clearance\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
-        ("clearance", r"gap\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
+        ("clearance", r"(?:clearance|间隙|间隔|嵌套间隙)\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
+        ("clearance", r"(?:gap|spacing)\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
         ("pitch_x", r"pitch[_\s-]*x\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
         ("pitch_y", r"pitch[_\s-]*y\s*[:=]?\s*([\d\.]+\s*(?:mm|cm|m)?)"),
         ("nx", r"\bnx\s*[:=]?\s*(\d+)"),

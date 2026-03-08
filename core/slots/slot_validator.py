@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from core.config.output_format_registry import accepted_output_formats
+from core.geometry.family_catalog import SUPPORTED_GEOMETRY_KINDS
 from core.slots.slot_frame import SlotFrame
 
 
-_GEOMETRY_KINDS = {"box", "cylinder", "sphere"}
 _SOURCE_KINDS = {"point", "beam", "plane", "isotropic"}
 @dataclass
 class SlotValidationResult:
@@ -23,7 +23,7 @@ def _valid_vec3(value: object) -> bool:
 def validate_slot_frame(frame: SlotFrame) -> SlotValidationResult:
     errors: list[str] = []
 
-    if frame.geometry.kind is not None and frame.geometry.kind not in _GEOMETRY_KINDS:
+    if frame.geometry.kind is not None and frame.geometry.kind not in SUPPORTED_GEOMETRY_KINDS:
         errors.append(f"geometry.kind_invalid:{frame.geometry.kind}")
     if frame.geometry.size_triplet_mm is not None:
         if not _valid_vec3(frame.geometry.size_triplet_mm):
@@ -34,6 +34,63 @@ def validate_slot_frame(frame: SlotFrame) -> SlotValidationResult:
         errors.append("geometry.radius_mm_nonpositive")
     if frame.geometry.half_length_mm is not None and float(frame.geometry.half_length_mm) <= 0:
         errors.append("geometry.half_length_mm_nonpositive")
+    if frame.geometry.radius1_mm is not None and float(frame.geometry.radius1_mm) <= 0:
+        errors.append("geometry.radius1_mm_nonpositive")
+    if frame.geometry.radius2_mm is not None and float(frame.geometry.radius2_mm) <= 0:
+        errors.append("geometry.radius2_mm_nonpositive")
+    if frame.geometry.x1_mm is not None and float(frame.geometry.x1_mm) <= 0:
+        errors.append("geometry.x1_mm_nonpositive")
+    if frame.geometry.x2_mm is not None and float(frame.geometry.x2_mm) <= 0:
+        errors.append("geometry.x2_mm_nonpositive")
+    if frame.geometry.y1_mm is not None and float(frame.geometry.y1_mm) <= 0:
+        errors.append("geometry.y1_mm_nonpositive")
+    if frame.geometry.y2_mm is not None and float(frame.geometry.y2_mm) <= 0:
+        errors.append("geometry.y2_mm_nonpositive")
+    if frame.geometry.z_mm is not None and float(frame.geometry.z_mm) <= 0:
+        errors.append("geometry.z_mm_nonpositive")
+    if frame.geometry.z_planes_mm is not None:
+        if not isinstance(frame.geometry.z_planes_mm, list) or len(frame.geometry.z_planes_mm) != 3:
+            errors.append("geometry.z_planes_mm_invalid")
+        elif not all(isinstance(x, (int, float)) for x in frame.geometry.z_planes_mm):
+            errors.append("geometry.z_planes_mm_invalid")
+    if frame.geometry.radii_mm is not None:
+        if not isinstance(frame.geometry.radii_mm, list) or len(frame.geometry.radii_mm) != 3:
+            errors.append("geometry.radii_mm_invalid")
+        elif not all(isinstance(x, (int, float)) and float(x) > 0 for x in frame.geometry.radii_mm):
+            errors.append("geometry.radii_mm_invalid")
+    for attr in (
+        "trap_x1_mm",
+        "trap_x2_mm",
+        "trap_x3_mm",
+        "trap_x4_mm",
+        "trap_y1_mm",
+        "trap_y2_mm",
+        "trap_z_mm",
+        "para_x_mm",
+        "para_y_mm",
+        "para_z_mm",
+        "torus_major_radius_mm",
+        "torus_minor_radius_mm",
+        "ellipsoid_ax_mm",
+        "ellipsoid_by_mm",
+        "ellipsoid_cz_mm",
+        "elltube_ax_mm",
+        "elltube_by_mm",
+        "elltube_hz_mm",
+    ):
+        value = getattr(frame.geometry, attr)
+        if value is not None and float(value) <= 0:
+            errors.append(f"geometry.{attr}_nonpositive")
+    if frame.geometry.polyhedra_sides is not None and int(frame.geometry.polyhedra_sides) < 3:
+        errors.append("geometry.polyhedra_sides_invalid")
+    for attr in ("para_alpha_deg", "para_theta_deg", "para_phi_deg"):
+        value = getattr(frame.geometry, attr)
+        if value is not None and not isinstance(value, (int, float)):
+            errors.append(f"geometry.{attr}_invalid")
+    if frame.geometry.tilt_x_deg is not None and float(frame.geometry.tilt_x_deg) < 0:
+        errors.append("geometry.tilt_x_deg_negative")
+    if frame.geometry.tilt_y_deg is not None and float(frame.geometry.tilt_y_deg) < 0:
+        errors.append("geometry.tilt_y_deg_negative")
 
     if frame.source.kind is not None and frame.source.kind not in _SOURCE_KINDS:
         errors.append(f"source.kind_invalid:{frame.source.kind}")

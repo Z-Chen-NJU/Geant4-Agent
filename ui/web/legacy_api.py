@@ -134,9 +134,9 @@ def _heuristic_focus(text: str) -> List[str]:
 
 def _infer_geometry_hint(text: str) -> Optional[str]:
     low = text.lower()
-    if any(k in low for k in ["cube", "box", "绔嬫柟浣?, "闀挎柟浣?]):
+    if any(k in low for k in ["cube", "box", "立方体", "长方体"]):
         return "single_box"
-    if any(k in low for k in ["cylinder", "tubs", "鍦嗘煴"]):
+    if any(k in low for k in ["cylinder", "tubs", "圆柱"]):
         return "single_tubs"
     return None
 
@@ -145,7 +145,7 @@ def _has_explicit_geometry_assignment(text: str) -> bool:
     low = text.lower()
     if re.search(r"\b(structure|geometry)\s*[:=]", low):
         return True
-    if re.search(r"(鍑犱綍|缁撴瀯)\s*[:=]", text):
+    if re.search(r"(几何|结构)\s*[:=]", text):
         return True
 
     shape_tokens = (
@@ -164,14 +164,14 @@ def _has_explicit_geometry_assignment(text: str) -> bool:
         "polycone",
         "cuttubs",
         "boolean",
-        "鐜舰",
-        "闃靛垪",
-        "鍫嗗彔",
-        "宓屽",
-        "澹冲眰",
-        "绔嬫柟浣?,
-        "鍦嗘煴",
-        "鐞?,
+        "环形",
+        "阵列",
+        "堆叠",
+        "嵌套",
+        "壳层",
+        "立方体",
+        "圆柱",
+        "球",
     )
     verb_tokens = (
         "use",
@@ -669,10 +669,10 @@ def _is_physics_recommend_request(text: str) -> bool:
     physics_tokens = [
         "physics list",
         "physics_list",
-        "鐗╃悊鍒楄〃",
-        "鐗╃悊杩囩▼",
-        "棰勭疆鐗╃悊",
-        "棰勮鐗╃悊",
+        "物理列表",
+        "物理过程",
+        "预置物理",
+        "预设物理",
     ]
     decision_tokens = [
         "choose",
@@ -681,11 +681,11 @@ def _is_physics_recommend_request(text: str) -> bool:
         "best",
         "most suitable",
         "pick",
-        "閫夋嫨",
-        "鎺ㄨ崘",
-        "鏈€鍚堥€?,
-        "缁欏嚭鍚嶇О",
-        "澶囬€?,
+        "选择",
+        "推荐",
+        "最合适",
+        "给出名称",
+        "备选",
     ]
     has_physics = any(t in low or t in text for t in physics_tokens)
     has_decision = any(t in low or t in text for t in decision_tokens)
@@ -789,7 +789,7 @@ def legacy_step(payload: Dict[str, Any]) -> Dict[str, Any]:
     needs_norm = bool(debug.get("requires_llm_normalization", False))
     if needs_norm:
         msg = (
-            "璇峰厛鍚敤/淇 LLM 褰掍竴鍖栵紙Ollama锛夛紝鍐嶇户缁彁鍙栧弬鏁般€?
+            "请先启用或修复 LLM 归一化（Ollama），再继续提取参数。"
             if lang == "zh"
             else "Please enable/fix LLM normalization (Ollama) before parameter extraction."
         )
@@ -806,7 +806,7 @@ def legacy_step(payload: Dict[str, Any]) -> Dict[str, Any]:
             "missing_fields": state.missing_fields,
             "assistant_message": msg,
             "phase": "normalization",
-            "phase_title": "杈撳叆褰掍竴鍖? if lang == "zh" else "Input Normalization",
+            "phase_title": "输入归一化" if lang == "zh" else "Input Normalization",
             "asked_fields": [],
             "asked_fields_friendly": [],
             "is_complete": False,

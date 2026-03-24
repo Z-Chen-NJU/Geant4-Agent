@@ -6,7 +6,7 @@ A Geant4-oriented geometry assembly prototype: DSL + feasibility checker, plus a
 
 This repo is now easier to read if you treat it as three groups rather than one flat tree:
 
-- Runtime path: `core/`, `nlu/`, `planner/`, `ui/web/`
+- Runtime path: `core/`, `nlu/`, `planner/`, `ui/web/`, `ui/desktop/`
 - Deterministic builders and knowledge: `builder/geometry/`, `knowledge/`
 - Historical assets and generated deliverables: `docs/archive/`, `legacy/`, `docs/reports/`
 
@@ -17,7 +17,8 @@ Main directories:
 - `builder/geometry/`: DSL + feasibility checker + geometry synthesis
 - `planner/`: clarification planning and question rendering
 - `knowledge/`: materials, particles, physics lists, schemas, and validation tools
-- `ui/web/`: local multi-turn web UI
+- `ui/web/`: local multi-turn web UI payload and HTTP renderer
+- `ui/desktop/`: Chromium desktop shell migration target
 - `docs/`: active docs, release docs, reports, and archives
 - `legacy/`: frozen legacy programs and reports
 
@@ -27,7 +28,7 @@ Main directories:
 - **NLU core** (`nlu/`): Runtime semantic extraction, LLM-assisted parsing, structure extraction, and separated BERT training assets.
 - **Planner layer** (`planner/`): LLM-driven question planning and schema-constrained outputs.
 - **Knowledge layer** (`knowledge/`): JSON schema, validated lists, and validation.
-- **UI layer** (`ui/web/`): Local multi-turn interface.
+- **UI layer** (`ui/web/`, `ui/desktop/`): Local multi-turn interface and desktop-shell migration path.
 - **Core** (`core/`): Shared contracts, orchestration, dialogue state, and validation.
 
 See: `docs/architecture/ARCHITECTURE.md` and `docs/PROJECT_CONCLUSION_2026-03-23.md`.
@@ -80,6 +81,20 @@ python ui/web/server.py
 Then open:
 - http://127.0.0.1:8088
 
+## Chromium Desktop Shell
+
+Stage-1 desktop shell files now live under `ui/desktop/`.
+
+The intended startup model is:
+
+```powershell
+cd ui/desktop
+npm install
+npm start
+```
+
+This shell reuses the current `ui/web/` frontend and starts the Python runtime locally through `python -m ui.desktop.runtime_bridge`.
+
 ## Archived Tooling
 
 Evaluation, regression, and one-off dataset scripts have been moved out of the main tree into local-only archived tooling under `legacy/tooling/`.
@@ -119,7 +134,7 @@ To use API-key based providers, set `api_key` or `api_key_env` in the config.
 
 现在更适合按三类理解这个仓库：
 
-- 运行主链路：`core/`、`nlu/`、`planner/`、`ui/web/`
+- 运行主链路：`core/`、`nlu/`、`planner/`、`ui/web/`、`ui/desktop/`
 - 确定性构建与知识：`builder/geometry/`、`knowledge/`
 - 历史归档与生成物：`docs/archive/`、`legacy/`、`docs/reports/`
 
@@ -130,7 +145,8 @@ To use API-key based providers, set `api_key` or `api_key_env` in the config.
 - `builder/geometry/`：DSL、可行性检查、几何合成
 - `planner/`：追问规划和问题渲染
 - `knowledge/`：材料、粒子、物理列表、schema 与校验工具
-- `ui/web/`：本地多轮 Web UI
+- `ui/web/`：本地多轮 Web UI 载荷与 HTTP 渲染层
+- `ui/desktop/`：Chromium 桌面壳迁移目标
 - `docs/`：当前文档、发布材料、回归报告、归档材料
 - `legacy/`：冻结的旧程序和历史报告
 
@@ -140,7 +156,7 @@ To use API-key based providers, set `api_key` or `api_key_env` in the config.
 - **语义核心**（`nlu/`）：运行时语义抽取、LLM 辅助解析、结构识别，以及拆分后的 BERT 训练资产。
 - **规划层**（`planner/`）：LLM 驱动的追问与 schema 约束输出。
 - **知识层**（`knowledge/`）：JSON schema、可溯源列表与校验。
-- **UI 层**（`ui/web/`）：本地多轮对话界面。
+- **UI 层**（`ui/web/`、`ui/desktop/`）：本地多轮对话界面与桌面壳迁移入口。
 - **Core**（`core/`）：共享契约、编排、对话状态与校验。
 
 详见：`docs/architecture/ARCHITECTURE.md` 与 `docs/PROJECT_CONCLUSION_2026-03-23.md`
@@ -196,6 +212,20 @@ python ui/web/server.py
 
 然后访问：
 - http://127.0.0.1:8088
+
+## Chromium 桌面壳
+
+第一阶段桌面壳文件已经放到 `ui/desktop/`。
+
+目标启动方式：
+
+```powershell
+cd ui/desktop
+npm install
+npm start
+```
+
+这一阶段会复用当前 `ui/web/` 前端，并通过 `python -m ui.desktop.runtime_bridge` 在本地拉起 Python 运行时。
 
 ## LLM 提供方配置（Ollama / OpenAI 兼容）
 

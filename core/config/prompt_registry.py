@@ -42,6 +42,8 @@ def clarification_prompt(
     confirmed = ", ".join(confirmed_items or [])
     recent_user_text = (recent_user_text or "").strip()
     if _lang_key(lang) == "zh":
+        recent_display = recent_user_text or "无"
+        confirmed_display = confirmed or "无"
         return (
             "\u4f60\u662f Geant4-Agent \u7684\u5bf9\u8bdd\u52a9\u624b\u3002"
             "\u76ee\u6807\uff1a\u57fa\u4e8e\u5f53\u524d\u4e0a\u4e0b\u6587\uff0c\u7528\u81ea\u7136\u3001\u4e0d\u673a\u68b0\u7684\u8bed\u6c14\u53d1\u8d77\u8ffd\u95ee\u3002"
@@ -50,8 +52,8 @@ def clarification_prompt(
             "2) \u4e0d\u8981\u65b0\u589e\u9700\u6c42\uff1b"
             "3) \u4e00\u8f6e\u6700\u591a\u95ee 1~2 \u4e2a\u5173\u952e\u7f3a\u5931\u70b9\uff1b"
             "4) \u8f93\u51fa\u4e00\u6bb5\u6700\u7ec8\u95ee\u53e5\uff0c\u4e0d\u8981\u89e3\u91ca\u3002\n"
-            f"\u7528\u6237\u6700\u8fd1\u8f93\u5165\uff1a{recent_user_text or '\u65e0'}\n"
-            f"\u5df2\u786e\u8ba4\u4fe1\u606f\uff1a{confirmed or '\u65e0'}\n"
+            f"\u7528\u6237\u6700\u8fd1\u8f93\u5165\uff1a{recent_display}\n"
+            f"\u5df2\u786e\u8ba4\u4fe1\u606f\uff1a{confirmed_display}\n"
             f"\u672c\u8f6e\u5f85\u8865\u5145\uff1a{joined}\n"
             "\u8ffd\u95ee\uff1a"
         )

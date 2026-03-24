@@ -656,10 +656,23 @@ def _semantic_missing_from_debug(debug: dict[str, Any]) -> list[str]:
     if not isinstance(graph_choice, dict):
         return []
     return _dedupe_paths(list(graph_choice.get("dialogue_missing_paths", []) or []))
-def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: float = 0.6, lang: str = "zh") -> dict:
+def _progress(progress_cb, stage: str, label: str, detail: str | None = None) -> None:
+    if progress_cb:
+        progress_cb(stage, label, detail)
+
+
+def process_turn(
+    payload: dict,
+    *,
+    ollama_config_path: str,
+    min_confidence: float = 0.6,
+    lang: str = "zh",
+    progress_cb=None,
+) -> dict:
     text = str(payload.get("text", "")).strip()
     if not text:
         return {"error": "missing text"}
+    _progress(progress_cb, "start", "Reading request", "Preparing session state and turn context.")
     state = get_or_create_session(payload.get("session_id"))
     previous_missing_paths = _dedupe_paths(
         validate_layer_c_completeness(state.config).missing_required_paths + list(state.semantic_missing_paths)
@@ -693,8 +706,10 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
     staged_pending_overwrite: list[dict[str, Any]] = []
     rejected_overwrite_preview: list[dict[str, Any]] = []
     explicit_controls = infer_user_turn_controls(text)
+    _progress(progress_cb, "intent", "Interpreting intent", "User controls and overwrite intent parsed.")
 
     if enable_llm_first:
+        _progress(progress_cb, "slot_frame", "Building slot frame", "Running LLM-first slot extraction.")
         slot_result = build_llm_slot_frame(
             text,
             context_summary=context_summary,
@@ -706,6 +721,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
             normalized_text = slot_result.normalized_text or text
             slot_debug = dict(slot_result.stage_trace or {})
             slot_debug.setdefault("final_status", "ok")
+            _progress(progress_cb, "semantic_extract", "Extracting semantic candidates", "Runtime semantic extraction from normalized text.")
             extracted_candidate, debug = extract_candidates_from_normalized_text(
                 normalized_text,
                 raw_text=text,
@@ -743,6 +759,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
             slot_debug = dict(slot_result.stage_trace or {})
             if slot_result.fallback_reason:
                 llm_stage_failures.append(slot_result.fallback_reason)
+            _progress(progress_cb, "semantic_frame", "Falling back to semantic frame", "Slot frame fallback triggered; trying semantic-frame route.")
             semantic_result = build_llm_semantic_frame(
                 text,
                 context_summary=context_summary,
@@ -752,6 +769,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
             if semantic_result.ok and semantic_result.candidate and semantic_result.user_candidate:
                 user_candidate = _apply_explicit_user_controls(semantic_result.user_candidate, explicit_controls)
                 normalized_text = semantic_result.normalized_text or text
+                _progress(progress_cb, "semantic_extract", "Extracting semantic candidates", "Runtime semantic extraction from semantic-frame text.")
                 extracted_candidate, debug = extract_candidates_from_normalized_text(
                     normalized_text,
                     raw_text=text,
@@ -792,6 +810,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
                     fallback_reason = slot_result.fallback_reason
 
     if not llm_used:
+        _progress(progress_cb, "normalize", "Normalizing request", "Using fallback normalizer and deterministic extraction.")
         norm = normalize_user_turn(
             text,
             context_summary=context_summary,
@@ -828,6 +847,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
     if user_candidate is None:
         return {"error": "user intent unavailable"}
     dialogue_user_intent = user_candidate.intent.value
+    _progress(progress_cb, "candidate_merge", "Merging candidates", "Combining user intent, semantic candidates, and recommendation paths.")
 
     if state.pending_overwrite:
         if user_candidate.intent == Intent.CONFIRM:
@@ -940,6 +960,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
             lang=lang,
         )
     accepted_updates, rejected_updates, applied_rules = arbitrate_candidates(draft, candidates)
+    _progress(progress_cb, "arbitration", "Arbitrating updates", "Selecting updates that survive constraints and overwrite policy.")
     rejected_updates = pending_conflict_rejected + policy_rejected + rejected_updates
     if staged_pending_overwrite and not applying_pending_overwrite:
         applied_rules = [{"rule": "pending_overwrite_confirmation_required", "count": len(staged_pending_overwrite)}] + applied_rules
@@ -955,6 +976,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         applied_rules.append({"rule": "post_commit_semantic_sync", "count": len(post_default.updates)})
 
     report = validate_all(working)
+    _progress(progress_cb, "validation", "Validating config", "Running completeness and rule validation on the working config.")
     hard_errors = [e for e in report.errors if e.get("code") != "E_REQUIRED_MISSING"]
 
     if hard_errors:
@@ -1068,6 +1090,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
         last_dialogue_action=state.last_dialogue_action,
     )
     dialogue_trace = build_dialogue_trace(dialogue_decision)
+    _progress(progress_cb, "dialogue", "Rendering response", "Building grounded reply and dialogue summary.")
     dialogue_summary, raw_dialogue_before_reply, dialogue_memory = sync_dialogue_state(
         state,
         decision=dialogue_decision,
@@ -1091,6 +1114,7 @@ def process_turn(payload: dict, *, ollama_config_path: str, min_confidence: floa
     )
     state.last_dialogue_action = dialogue_decision.action.value
     state.history.append({"role": "assistant", "content": question})
+    _progress(progress_cb, "finalize", "Finalizing turn", "Persisting turn state and assembling response payload.")
     raw_dialogue = build_raw_dialogue(state.history)
     internal_trace = {
         "nlu": {

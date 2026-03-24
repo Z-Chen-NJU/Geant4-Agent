@@ -8,6 +8,7 @@ from typing import Any, Dict
 from ui.web.legacy_api import SESSIONS as LEGACY_SESSIONS
 from ui.web.legacy_api import legacy_solve as _legacy_solve
 from ui.web.legacy_api import legacy_step as _legacy_step
+from ui.web.geant4_api import geant4_state_payload
 from ui.web.request_router import handle_post_request, is_supported_post_path
 from ui.web.runtime_state import runtime_config_payload as _runtime_config_payload
 from ui.web.strict_api import handle_strict_step
@@ -29,7 +30,7 @@ def _load_file(path: Path) -> bytes:
     return path.read_bytes()
 
 
-def step(payload: Dict[str, Any]) -> Dict[str, Any]:
+def step(payload: Dict[str, Any], progress_cb=None) -> Dict[str, Any]:
     text = str(payload.get('text', '')).strip()
     session_id = payload.get('session_id')
     llm_router = bool(payload.get('llm_router', True))
@@ -51,7 +52,8 @@ def step(payload: Dict[str, Any]) -> Dict[str, Any]:
                 'autofix': autofix,
                 'lang': lang,
                 'min_confidence': min_conf,
-            }
+            },
+            progress_cb=progress_cb,
         )
 
     return _legacy_step(payload)
@@ -74,6 +76,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == 'api/runtime':
             _respond(self, 200, _runtime_config_payload())
+            return
+        if path == 'api/geant4/state':
+            _respond(self, 200, geant4_state_payload())
             return
         if path in {'style.css', 'app.js'}:
             data = _load_file(ROOT / path)

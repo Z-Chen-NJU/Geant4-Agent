@@ -3,98 +3,190 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Geant4-Agent Lab</title>
+    <title>Geant4-Agent</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div class="bg"></div>
-    <main class="shell">
-      <header class="hero">
-        <div class="badge" data-i18n="badge">Local Web Console</div>
-        <h1>Geant4-Agent</h1>
-        <p class="subtitle">
-          <span data-i18n="subtitle">Multi-turn dialogue to complete requirements and generate configs.</span>
-        </p>
-      </header>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <div class="brand-mark">GA</div>
+          <div>
+            <h1>Geant4-Agent</h1>
+            <p data-i18n="brand_subtitle">Dialogue workspace for simulation planning and runtime control.</p>
+          </div>
+        </div>
 
-      <section class="card">
-        <h2 data-i18n="input_title">Input</h2>
-        <label class="field">
-          <span data-i18n="input_label">Describe your experiment</span>
-          <textarea
-            id="input-text"
-            rows="4"
-            data-i18n-placeholder="input_placeholder"
-            placeholder="e.g., shoot gamma at a copper cube and observe energy deposition..."
-          ></textarea>
-        </label>
+        <section class="side-card">
+          <h2 data-i18n="session_title">Session</h2>
+          <div class="meta-list">
+            <div class="meta-row">
+              <span data-i18n="session_label">Session</span>
+              <strong id="sidebar-session-id">new</strong>
+            </div>
+            <div class="meta-row">
+              <span data-i18n="phase_label">Phase</span>
+              <strong id="sidebar-runtime-phase">idle</strong>
+            </div>
+            <div class="meta-row">
+              <span data-i18n="model_label">Model</span>
+              <strong id="sidebar-model-name">-</strong>
+            </div>
+          </div>
+          <div id="runtime-notice" class="runtime-notice"></div>
+        </section>
 
-        <div class="grid">
+        <section class="side-card">
+          <h2 data-i18n="controls_title">Controls</h2>
           <label class="field">
-            <span data-i18n="model_label">LLM Config</span>
+            <span data-i18n="model_config">Model Config</span>
             <select id="model-config-select"></select>
           </label>
           <label class="field">
-            <span data-i18n="lang_label">Language</span>
+            <span data-i18n="language">Language</span>
             <select id="lang-select">
               <option value="zh">中文</option>
               <option value="en" selected>English</option>
             </select>
           </label>
           <label class="field">
-            <span data-i18n="min_conf">Structure confidence threshold</span>
+            <span data-i18n="confidence">Structure Confidence</span>
             <input id="min-conf" type="number" min="0" max="1" step="0.05" value="0.6" />
           </label>
-          <label class="field toggle">
-            <span data-i18n="autofix">Auto-fix</span>
+          <label class="check-row">
             <input id="autofix" type="checkbox" checked />
+            <span data-i18n="autofix">Auto-fix</span>
           </label>
-          <label class="field toggle">
-            <span data-i18n="llm_routing">LLM routing</span>
+          <label class="check-row">
             <input id="llm-router" type="checkbox" checked />
+            <span data-i18n="llm_routing">LLM routing</span>
           </label>
-          <label class="field toggle">
-            <span data-i18n="llm_question">LLM question</span>
+          <label class="check-row">
             <input id="llm-question" type="checkbox" checked />
+            <span data-i18n="llm_follow_up">LLM follow-up</span>
           </label>
-        </div>
+          <button id="reset-btn" class="ghost wide" data-i18n="reset">Reset session</button>
+        </section>
 
-        <div id="runtime-notice" class="runtime-notice"></div>
+        <section class="side-card">
+          <h2 data-i18n="summary">Summary</h2>
+          <pre id="summary"></pre>
+        </section>
+      </aside>
 
-        <div class="actions">
-          <button id="run-btn" data-i18n="send">Send</button>
-          <button id="reset-btn" class="ghost" data-i18n="reset">Reset Session</button>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2 data-i18n="dialogue">Dialogue</h2>
-        <div id="chat" class="chat"></div>
-      </section>
-
-      <section class="card">
-        <h2 data-i18n="output">Output</h2>
-        <div class="columns">
+      <main class="main-shell">
+        <header class="topbar">
           <div>
-            <h3 data-i18n="summary">Summary</h3>
-            <pre id="summary"></pre>
+            <div class="eyebrow" data-i18n="conversation">Conversation</div>
+            <h2 data-i18n="conversation_title">Simulation Planning Chat</h2>
           </div>
-          <div>
-            <h3 data-i18n="config_json">Config JSON</h3>
-            <pre id="response"></pre>
+          <div class="chip-row">
+            <span class="chip" id="header-phase-chip">idle</span>
+            <span class="chip muted" id="header-complete-chip">incomplete</span>
+            <span class="chip muted" id="runtime-status-inline">offline</span>
           </div>
+        </header>
+
+        <div class="workspace">
+          <section class="chat-panel">
+            <div id="chat" class="chat"></div>
+
+            <div class="composer-shell">
+              <div class="quick-actions">
+                <button id="g4-sync-btn" class="ghost" data-i18n="sync_config">Sync Config</button>
+                <button id="g4-viewer-btn" class="ghost" data-i18n="open_viewer">Open Viewer</button>
+                <button id="g4-init-btn" class="ghost" data-i18n="initialize">Initialize</button>
+                <button id="g4-run-btn" class="ghost" data-i18n="run_one">Run 1 Event</button>
+                <button id="g4-run10-btn" class="ghost" data-i18n="run_ten">Run 10 Events</button>
+                <button id="g4-refresh-btn" class="ghost" data-i18n="refresh">Refresh</button>
+              </div>
+
+              <div class="composer">
+                <textarea
+                  id="input-text"
+                  rows="4"
+                  data-i18n-placeholder="input_placeholder"
+                  placeholder="Describe the experiment you want to build. Press Enter to send, Shift+Enter for a new line."
+                ></textarea>
+                <div class="composer-footer">
+                  <div class="composer-hint" id="composer-status">
+                    <span data-i18n="composer_hint">Build the requirement in dialogue first. Use the runtime buttons after the structure looks right.</span>
+                  </div>
+                  <div class="thinking-indicator" id="thinking-indicator" hidden>
+                    <span></span><span></span><span></span>
+                  </div>
+                  <button id="run-btn" data-i18n="send">Send</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <aside class="inspector">
+            <section class="inspector-card">
+              <h3 data-i18n="config_overview">Configuration Overview</h3>
+              <div id="config-overview" class="overview-grid"></div>
+            </section>
+
+            <section class="inspector-card">
+              <h3 data-i18n="completion_status">Completion Status</h3>
+              <div class="status-split">
+                <div>
+                  <div class="status-title" data-i18n="filled_items">Filled</div>
+                  <div id="filled-items" class="tag-list"></div>
+                </div>
+                <div>
+                  <div class="status-title" data-i18n="missing_items">Missing</div>
+                  <div id="missing-items" class="tag-list missing"></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="inspector-card">
+              <h3 data-i18n="runtime_state">Runtime State</h3>
+              <div id="runtime-overview" class="overview-grid compact"></div>
+            </section>
+
+            <section class="inspector-card">
+              <h3 data-i18n="runtime_log">Runtime Log</h3>
+              <div id="runtime-log-summary" class="log-summary"></div>
+            </section>
+
+            <section class="inspector-card debug-card">
+              <details id="debug-details" class="debug-details">
+                <summary class="debug-summary">
+                  <span data-i18n="debug_panel">Debug Panel</span>
+                </summary>
+
+                <div id="debug-terminal-block" class="debug-block">
+                  <div class="debug-title" data-i18n="terminal_log">Terminal</div>
+                  <pre id="geant4-log"></pre>
+                </div>
+
+                <div id="debug-process-block" class="debug-block">
+                  <div class="debug-title" data-i18n="process">Process</div>
+                  <pre id="process-log"></pre>
+                </div>
+
+                <div id="debug-trace-block" class="debug-block">
+                  <div class="debug-title" data-i18n="internal_trace">Internal Trace</div>
+                  <pre id="internal-trace"></pre>
+                </div>
+
+                <div id="debug-config-block" class="debug-block">
+                  <div class="debug-title" data-i18n="raw_config">Raw Config</div>
+                  <pre id="response"></pre>
+                </div>
+
+                <div id="debug-runtime-block" class="debug-block">
+                  <div class="debug-title" data-i18n="raw_runtime">Raw Runtime</div>
+                  <pre id="geant4-state"></pre>
+                </div>
+              </details>
+            </section>
+          </aside>
         </div>
-      </section>
-
-      <section class="card">
-        <h2 data-i18n="process_title">Process</h2>
-        <pre id="process-log"></pre>
-        <h3 data-i18n="internal_trace_title">Internal Iteration Chain</h3>
-        <pre id="internal-trace"></pre>
-      </section>
-
-      <footer class="footer"><span data-i18n="footer">Local-only: no external UI dependencies.</span></footer>
-    </main>
+      </main>
+    </div>
     <script src="app.js"></script>
   </body>
 </html>

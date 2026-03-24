@@ -108,6 +108,12 @@ venv.bak/
 .vscode/
 .idea/
 
+# Desktop shell
+ui/desktop/node_modules/
+ui/desktop/dist/
+ui/desktop/out/
+ui/desktop/.vite/
+
 # Ruff / mypy / pyre / pytype
 .ruff_cache/
 .mypy_cache/
@@ -150,6 +156,8 @@ docs/datasets/casebank/eval_casebank_multiturn_live_*.json
 
 # Local scratch
 tmp_*.txt
+runtime_artifacts/
+runtime/geant4_local_app/build/
 
 # Archived local-only tooling
 scripts/

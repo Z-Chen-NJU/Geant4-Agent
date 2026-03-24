@@ -162,6 +162,10 @@ runtime/geant4_local_app/build/
 # Archived local-only tooling
 scripts/
 legacy/tooling/
+legacy/programs/
+legacy/reports/
+scripts/__pycache__/
+legacy/**/__pycache__/
 
 # Training assets / local model artifacts
 nlu/training/bert_lab/models/**/checkpoint-*/

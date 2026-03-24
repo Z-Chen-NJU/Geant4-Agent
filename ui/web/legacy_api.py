@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from builder.geometry.synthesize import synthesize_from_params
 from core.config.defaults import build_legacy_default_config
 from core.config.field_registry import friendly_labels
 from core.config.phase_registry import phase_title, select_phase_fields
@@ -15,6 +14,14 @@ from core.config.prompt_registry import clarification_fallback, completion_messa
 from nlu.llm_support.llm_bridge import build_missing_params_prompt, build_missing_params_schema
 from nlu.llm_support.ollama_client import chat, extract_json
 from planner.agent import ask_missing
+from ui.web.legacy_runtime_mapper import (
+    apply_frame as _apply_frame,
+    apply_text_overrides as _apply_text_overrides,
+    build_user_friendly as _build_user_friendly,
+    compute_missing as _compute_missing,
+    ensure_material_volume_map as _ensure_material_volume_map,
+    export_min_config as _export_min_config,
+)
 from ui.web.runtime_state import get_ollama_config_path
 
 ROOT = Path(__file__).parent
@@ -299,247 +306,6 @@ def _decide_focus(text: str, missing_fields: List[str], llm_router: bool) -> Dic
     }
 
 
-def _apply_frame(
-    config: Dict[str, Any],
-    frame: Any,
-    debug: Dict[str, Any],
-    autofix: bool,
-    geometry_hint: Optional[str],
-) -> Dict[str, Any]:
-    # Merge geometry
-    structure = frame.geometry.structure
-    if not structure and geometry_hint:
-        structure = geometry_hint
-    if structure:
-        config["geometry"]["structure"] = structure
-    if getattr(frame.geometry, "chosen_skeleton", None):
-        config["geometry"]["chosen_skeleton"] = frame.geometry.chosen_skeleton
-    if frame.geometry.params:
-        config["geometry"]["params"].update(frame.geometry.params)
-    if getattr(frame.geometry, "graph_program", None):
-        config["geometry"]["graph_program"] = frame.geometry.graph_program
-
-    if config["geometry"].get("graph_program"):
-        config["geometry"]["dsl"] = config["geometry"]["graph_program"]
-        chosen = debug.get("graph_chosen_skeleton", "")
-        gcands = debug.get("graph_candidates", [])
-        cobj = None
-        for c in gcands:
-            if c.get("structure") == chosen:
-                cobj = c
-                break
-        if cobj is not None:
-            config["geometry"]["feasible"] = bool(cobj.get("feasible", False))
-            config["geometry"]["errors"] = list(cobj.get("errors", []))
-            config["geometry"]["warnings"] = list(cobj.get("warnings", []))
-            config["geometry"]["missing_params"] = list(cobj.get("missing_params", []))
-        else:
-            config["geometry"]["feasible"] = None
-            config["geometry"]["errors"] = []
-            config["geometry"]["warnings"] = []
-            config["geometry"]["missing_params"] = []
-        config["geometry"]["scores"] = debug.get("scores", {})
-        config["geometry"]["ranked"] = debug.get("ranked", [])
-    elif config["geometry"]["structure"]:
-        synth = synthesize_from_params(
-            config["geometry"]["structure"],
-            config["geometry"]["params"],
-            seed=7,
-            apply_autofix=autofix,
-        )
-        config["geometry"]["dsl"] = synth.get("dsl")
-        config["geometry"]["feasible"] = synth.get("feasible")
-        config["geometry"]["errors"] = synth.get("errors", [])
-        config["geometry"]["missing_params"] = synth.get("missing_params", [])
-        config["geometry"]["scores"] = debug.get("scores", {})
-        config["geometry"]["ranked"] = debug.get("ranked", [])
-    else:
-        config["geometry"]["dsl"] = None
-        config["geometry"]["feasible"] = None
-        config["geometry"]["errors"] = ["structure confidence below threshold"]
-        config["geometry"]["missing_params"] = []
-        config["geometry"]["scores"] = debug.get("scores", {})
-        config["geometry"]["ranked"] = debug.get("ranked", [])
-
-    # Merge materials / source / physics / output
-    for mat in frame.materials.selected_materials:
-        if mat not in config["materials"]["selected_materials"]:
-            config["materials"]["selected_materials"].append(mat)
-    if frame.physics.physics_list:
-        config["physics"]["physics_list"] = frame.physics.physics_list
-    if frame.source.particle:
-        config["source"]["particle"] = frame.source.particle
-    if frame.source.type:
-        config["source"]["type"] = frame.source.type
-    if frame.output.format:
-        config["output"]["format"] = frame.output.format
-    config["notes"].extend(getattr(frame, "notes", []))
-    return config
-
-
-def _parse_source_energy_mev(text: str) -> Optional[float]:
-    import re
-
-    m = re.search(r"([-+]?\d*\.?\d+)\s*(mev|gev|kev)", text.lower())
-    if not m:
-        return None
-    value = float(m.group(1))
-    unit = m.group(2)
-    if unit == "gev":
-        return value * 1000.0
-    if unit == "kev":
-        return value * 0.001
-    return value
-
-
-def _parse_triplet(text: str, key: str) -> Optional[Dict[str, Any]]:
-    import re
-
-    pat = rf"{key}\s*[:=]?\s*\(?\s*([-+]?\d*\.?\d+)\s*[, ]\s*([-+]?\d*\.?\d+)\s*[, ]\s*([-+]?\d*\.?\d+)\s*\)?"
-    m = re.search(pat, text.lower())
-    if not m:
-        return None
-    return {"type": "vector", "value": [float(m.group(1)), float(m.group(2)), float(m.group(3))]}
-
-
-def _infer_direction_from_text(text: str) -> Optional[Dict[str, Any]]:
-    low = text.lower().replace(" ", "")
-    mapping = [
-        (("+z", "娌?z", "towards+z", "along+z"), [0.0, 0.0, 1.0]),
-        (("-z", "娌?z", "towards-z", "along-z"), [0.0, 0.0, -1.0]),
-        (("+x", "娌?x", "towards+x", "along+x"), [1.0, 0.0, 0.0]),
-        (("-x", "娌?x", "towards-x", "along-x"), [-1.0, 0.0, 0.0]),
-        (("+y", "娌?y", "towards+y", "along+y"), [0.0, 1.0, 0.0]),
-        (("-y", "娌?y", "towards-y", "along-y"), [0.0, -1.0, 0.0]),
-    ]
-    for keys, vec in mapping:
-        if any(k in low for k in keys):
-            return {"type": "vector", "value": vec}
-    return None
-
-
-def _infer_position_from_text(text: str) -> Optional[Dict[str, Any]]:
-    low = text.lower()
-    if any(k in low for k in ["origin", "at origin", "鍘熺偣", "涓績", "center"]):
-        return {"type": "vector", "value": [0.0, 0.0, 0.0]}
-    return None
-
-
-def _parse_output_path(text: str) -> Optional[str]:
-    import re
-
-    m = re.search(r"([A-Za-z]:[\\/][^\\s]+\\.(?:root|csv|json|xml|hdf5|h5)|[./\\w-]+\\.(?:root|csv|json|xml|hdf5|h5))", text)
-    if not m:
-        return None
-    return m.group(1)
-
-
-def _apply_text_overrides(config: Dict[str, Any], text: str) -> None:
-    low = text.lower()
-    energy = _parse_source_energy_mev(text)
-    if energy is not None:
-        config["source"]["energy"] = float(energy)
-    pos = _parse_triplet(text, "position")
-    if pos:
-        config["source"]["position"] = pos
-    direction = _parse_triplet(text, "direction")
-    if direction:
-        config["source"]["direction"] = direction
-    # Handle compact source style: "... at (x,y,z) to (dx,dy,dz)"
-    at_to = re.search(
-        r"\bat\s*\(?\s*([-+]?\d*\.?\d+)\s*[, ]\s*([-+]?\d*\.?\d+)\s*[, ]\s*([-+]?\d*\.?\d+)\s*\)?\s*"
-        r"(?:to|towards|->)\s*"
-        r"\(?\s*([-+]?\d*\.?\d+)\s*[, ]\s*([-+]?\d*\.?\d+)\s*[, ]\s*([-+]?\d*\.?\d+)\s*\)?",
-        low,
-    )
-    if at_to:
-        if not config["source"].get("position"):
-            config["source"]["position"] = {
-                "type": "vector",
-                "value": [float(at_to.group(1)), float(at_to.group(2)), float(at_to.group(3))],
-            }
-        if not config["source"].get("direction"):
-            config["source"]["direction"] = {
-                "type": "vector",
-                "value": [float(at_to.group(4)), float(at_to.group(5)), float(at_to.group(6))],
-            }
-    if not config["source"].get("position"):
-        inferred_pos = _infer_position_from_text(text)
-        if inferred_pos:
-            config["source"]["position"] = inferred_pos
-    if not config["source"].get("direction"):
-        inferred_dir = _infer_direction_from_text(text)
-        if inferred_dir:
-            config["source"]["direction"] = inferred_dir
-
-    if "point source" in low or "point-like" in low:
-        config["source"]["type"] = "point"
-    elif "beam" in low:
-        config["source"]["type"] = "beam"
-    elif "isotropic" in low:
-        config["source"]["type"] = "isotropic"
-
-    out_path = _parse_output_path(text)
-    if out_path:
-        config["output"]["path"] = out_path
-    if not config["output"].get("path") and config["output"].get("format"):
-        fmt = str(config["output"]["format"]).strip().lower()
-        if fmt:
-            config["output"]["path"] = f"output/result.{fmt}"
-
-
-def _ensure_material_volume_map(config: Dict[str, Any]) -> None:
-    mats = config.get("materials", {}).get("selected_materials", []) or []
-    vmap = config.get("materials", {}).get("volume_material_map", {})
-    if not isinstance(vmap, dict):
-        return
-    if vmap or not mats:
-        return
-    if not config.get("geometry", {}).get("structure"):
-        return
-    config["materials"]["volume_material_map"] = {"target": mats[0]}
-
-
-def _export_min_config(config: Dict[str, Any]) -> Dict[str, Any]:
-    vmap = config["materials"].get("volume_material_map", {}) or {}
-    if isinstance(vmap, dict):
-        volume_material_map = [{"volume": k, "material": v} for k, v in vmap.items() if k and v]
-    elif isinstance(vmap, list):
-        volume_material_map = vmap
-    else:
-        volume_material_map = []
-    if not volume_material_map and config["materials"].get("selected_materials"):
-        volume_material_map = [{"volume": "target", "material": config["materials"]["selected_materials"][0]}]
-
-    return {
-        "geometry": {
-            "graph_program": config["geometry"].get("graph_program"),
-            "structure": config["geometry"].get("structure"),
-            "params": config["geometry"].get("params", {}),
-        },
-        "materials": {
-            "volume_material_map": volume_material_map,
-            "environment": {
-                "temperature_K": config["environment"].get("temperature"),
-                "pressure_Pa": config["environment"].get("pressure"),
-            },
-        },
-        "physics_list": {
-            "name": config["physics"].get("physics_list"),
-        },
-        "source": {
-            "particle": config["source"].get("particle"),
-            "energy_MeV": config["source"].get("energy"),
-            "position": config["source"].get("position"),
-            "direction": config["source"].get("direction"),
-        },
-        "output": {
-            "format": config["output"].get("format"),
-            "path": config["output"].get("path"),
-        },
-    }
-
-
 def _is_missing_value(value: Any) -> bool:
     if value is None:
         return True
@@ -611,43 +377,6 @@ def _diff_paths(before: Dict[str, Any], after: Dict[str, Any]) -> List[str]:
         if b.get(k) != a.get(k):
             changed.append(k)
     return changed
-
-
-def _compute_missing(config: Dict[str, Any]) -> List[str]:
-    missing: List[str] = []
-    if config["geometry"].get("structure") and config["geometry"].get("missing_params"):
-        for p in config["geometry"]["missing_params"]:
-            missing.append(f"geometry.params.{p}")
-    try:
-        schema = _load_json(SCHEMA_PATH)
-        exported = _export_min_config(config)
-        missing.extend(_collect_required_missing(schema, exported))
-    except Exception:
-        pass
-    dedup: List[str] = []
-    seen = set()
-    for m in missing:
-        if m not in seen:
-            dedup.append(m)
-            seen.add(m)
-    return dedup
-
-
-def _build_user_friendly(config: Dict[str, Any]) -> str:
-    geo = config["geometry"]
-    geo_label = geo.get("structure") or (geo.get("chosen_skeleton") or "unknown")
-    return "\n".join(
-        [
-            f"Geometry: {geo_label}",
-            f"Feasible: {geo.get('feasible')}",
-            f"Materials: {', '.join(config['materials']['selected_materials']) or 'missing'}",
-            f"Particle: {config['source']['particle'] or 'missing'}",
-            f"Source type: {config['source']['type'] or 'missing'}",
-            f"Physics list: {config['physics']['physics_list'] or 'missing'}",
-            f"Output format: {config['output']['format'] or 'missing'}",
-            f"Output path: {config['output'].get('path') or 'missing'}",
-        ]
-    )
 
 
 def _ask_llm(

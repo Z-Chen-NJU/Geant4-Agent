@@ -10,6 +10,7 @@ from core.audit.audit_log import append_audit_entry
 from core.config.defaults import build_strict_default_config
 from core.config.field_registry import friendly_label
 from core.config.phase_registry import phase_title
+from core.domain.lexicon import BASE_MATERIAL_ALIASES, BASE_SOURCE_TYPE_ALIASES
 from core.dialogue.grounding import enforce_message_grounding
 from core.dialogue.policy import decide_dialogue_action
 from core.dialogue.renderer import render_dialogue_message
@@ -75,56 +76,9 @@ def _load_knowledge() -> dict[str, list[str]]:
 
 KNOWLEDGE = _load_knowledge()
 
-_MATERIAL_ALIASES = {
-    "air": "G4_AIR",
-    "water": "G4_WATER",
-    "silicon": "G4_Si",
-    "copper": "G4_Cu",
-    "aluminum": "G4_Al",
-    "aluminium": "G4_Al",
-    "iron": "G4_Fe",
-    "steel": "G4_STAINLESS-STEEL",
-    "stainless steel": "G4_STAINLESS-STEEL",
-    "lead": "G4_Pb",
-    "tungsten": "G4_W",
-    "csi": "G4_CESIUM_IODIDE",
-    "cesium iodide": "G4_CESIUM_IODIDE",
-    "caesium iodide": "G4_CESIUM_IODIDE",
-    "g4_si": "G4_Si",
-    "g4_cu": "G4_Cu",
-    "g4_al": "G4_Al",
-    "g4_fe": "G4_Fe",
-    "g4_pb": "G4_Pb",
-    "g4_w": "G4_W",
-    "铜": "G4_Cu",
-    "铝": "G4_Al",
-    "铁": "G4_Fe",
-    "钢": "G4_STAINLESS-STEEL",
-    "铅": "G4_Pb",
-    "钨": "G4_W",
-    "硅": "G4_Si",
-    "空气": "G4_AIR",
-    "水": "G4_WATER",
-    "碘化铯": "G4_CESIUM_IODIDE",
-}
+_MATERIAL_ALIASES = dict(BASE_MATERIAL_ALIASES)
 
-_SOURCE_TYPE_ALIASES = {
-    "point source": "point",
-    "点源": "point",
-    "点状源": "point",
-    "beam": "beam",
-    "pencil beam": "beam",
-    "collimated beam": "beam",
-    "collimated": "beam",
-    "束流": "beam",
-    "粒子束": "beam",
-    "准直束": "beam",
-    "plane source": "plane",
-    "plane": "plane",
-    "面源": "plane",
-    "isotropic": "isotropic",
-    "各向同性": "isotropic",
-}
+_SOURCE_TYPE_ALIASES = dict(BASE_SOURCE_TYPE_ALIASES)
 
 
 def _alias_match(text: str, mapping: dict[str, str], allowed: list[str]) -> str | None:

@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from core.domain.lexicon import BASE_MATERIAL_ALIASES, BASE_SOURCE_TYPE_ALIASES
 from core.semantic_frame import SemanticFrame
 from core.geometry.dialogue_registry import graph_dialogue_missing_paths
 from builder.geometry.synthesize import synthesize_from_params
@@ -20,54 +21,7 @@ MODELS_DIR = ROOT / "nlu" / "training" / "bert_lab" / "models"
 
 _CACHE: dict[str, list[str]] | None = None
 
-MATERIAL_ALIASES = {
-    "air": "G4_AIR",
-    "\u7a7a\u6c14": "G4_AIR",
-    "g4_air": "G4_AIR",
-    "water": "G4_WATER",
-    "\u6c34": "G4_WATER",
-    "g4_water": "G4_WATER",
-    "cesium iodide": "G4_CESIUM_IODIDE",
-    "caesium iodide": "G4_CESIUM_IODIDE",
-    "csi": "G4_CESIUM_IODIDE",
-    "碘化铯": "G4_CESIUM_IODIDE",
-    "g4_csi": "G4_CESIUM_IODIDE",
-    "g4_cesium_iodide": "G4_CESIUM_IODIDE",
-    "g4_cesium-iodide": "G4_CESIUM_IODIDE",
-    "silicon": "G4_Si",
-    "si": "G4_Si",
-    "\u7845": "G4_Si",
-    "g4_si": "G4_Si",
-    "copper": "G4_Cu",
-    "cu": "G4_Cu",
-    "\u94dc": "G4_Cu",
-    "g4_cu": "G4_Cu",
-    "aluminum": "G4_Al",
-    "aluminium": "G4_Al",
-    "al": "G4_Al",
-    "\u94dd": "G4_Al",
-    "g4_al": "G4_Al",
-    "concrete": "G4_CONCRETE",
-    "\u6df7\u51dd\u571f": "G4_CONCRETE",
-    "g4_concrete": "G4_CONCRETE",
-    "iron": "G4_Fe",
-    "fe": "G4_Fe",
-    "\u94c1": "G4_Fe",
-    "g4_fe": "G4_Fe",
-    "steel": "G4_STAINLESS-STEEL",
-    "stainless steel": "G4_STAINLESS-STEEL",
-    "\u94a2": "G4_STAINLESS-STEEL",
-    "g4_stainless-steel": "G4_STAINLESS-STEEL",
-    "g4_stainless_steel": "G4_STAINLESS-STEEL",
-    "lead": "G4_Pb",
-    "pb": "G4_Pb",
-    "\u94c5": "G4_Pb",
-    "g4_pb": "G4_Pb",
-    "tungsten": "G4_W",
-    "w": "G4_W",
-    "\u94a8": "G4_W",
-    "g4_w": "G4_W",
-}
+MATERIAL_ALIASES = dict(BASE_MATERIAL_ALIASES)
 
 PARTICLE_ALIASES = {
     "gamma": "gamma",
@@ -78,23 +32,7 @@ PARTICLE_ALIASES = {
     "neutron": "neutron",
 }
 
-SOURCE_TYPE_ALIASES = {
-    "point source": "point",
-    "point": "point",
-    "\u70b9\u6e90": "point",
-    "\u70b9\u72b6\u6e90": "point",
-    "beam": "beam",
-    "pencil beam": "beam",
-    "collimated beam": "beam",
-    "\u675f\u6d41": "beam",
-    "\u7c92\u5b50\u675f": "beam",
-    "\u51c6\u76f4\u675f": "beam",
-    "isotropic": "isotropic",
-    "\u5404\u5411\u540c\u6027": "isotropic",
-    "plane source": "plane",
-    "plane": "plane",
-    "\u9762\u6e90": "plane",
-}
+SOURCE_TYPE_ALIASES = dict(BASE_SOURCE_TYPE_ALIASES)
 
 FALLBACK_GRAPH_STRUCTURE = {
     "ring_modules": "ring",

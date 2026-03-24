@@ -6,6 +6,7 @@ from typing import Any
 
 from core.config.output_format_registry import canonical_output_format
 from core.config.llm_prompt_registry import build_strict_semantic_prompt
+from core.domain.lexicon import BASE_MATERIAL_ALIASES
 from core.orchestrator.types import CandidateUpdate, Intent, Producer, UpdateOp
 from core.validation.error_codes import (
     E_LLM_FRAME_CALL_FAILED,
@@ -44,51 +45,7 @@ _PARTICLE_ALIASES = {
     "proton": "proton",
     "neutron": "neutron",
 }
-_MATERIAL_ALIASES = {
-    "air": "G4_AIR",
-    "g4_air": "G4_AIR",
-    "\u7a7a\u6c14": "G4_AIR",
-    "water": "G4_WATER",
-    "g4_water": "G4_WATER",
-    "\u6c34": "G4_WATER",
-    "cesium iodide": "G4_CESIUM_IODIDE",
-    "caesium iodide": "G4_CESIUM_IODIDE",
-    "csi": "G4_CESIUM_IODIDE",
-    "\u7898\u5316\u94ef": "G4_CESIUM_IODIDE",
-    "g4_csi": "G4_CESIUM_IODIDE",
-    "g4_cesium_iodide": "G4_CESIUM_IODIDE",
-    "g4_cesium-iodide": "G4_CESIUM_IODIDE",
-    "silicon": "G4_Si",
-    "si": "G4_Si",
-    "g4_si": "G4_Si",
-    "\u7845": "G4_Si",
-    "copper": "G4_Cu",
-    "cu": "G4_Cu",
-    "g4_cu": "G4_Cu",
-    "\u94dc": "G4_Cu",
-    "aluminum": "G4_Al",
-    "aluminium": "G4_Al",
-    "al": "G4_Al",
-    "g4_al": "G4_Al",
-    "\u94dd": "G4_Al",
-    "iron": "G4_Fe",
-    "fe": "G4_Fe",
-    "\u94c1": "G4_Fe",
-    "g4_fe": "G4_Fe",
-    "steel": "G4_STAINLESS-STEEL",
-    "stainless steel": "G4_STAINLESS-STEEL",
-    "\u94a2": "G4_STAINLESS-STEEL",
-    "g4_stainless-steel": "G4_STAINLESS-STEEL",
-    "g4_stainless_steel": "G4_STAINLESS-STEEL",
-    "lead": "G4_Pb",
-    "pb": "G4_Pb",
-    "\u94c5": "G4_Pb",
-    "g4_pb": "G4_Pb",
-    "tungsten": "G4_W",
-    "w": "G4_W",
-    "\u94a8": "G4_W",
-    "g4_w": "G4_W",
-}
+_MATERIAL_ALIASES = dict(BASE_MATERIAL_ALIASES)
 _STRUCTURE_ALIASES = {
     "box": "single_box",
     "cube": "single_box",

@@ -4,7 +4,7 @@ import unittest
 
 from core.contracts.semantic import GeometryFrame, SemanticFrame
 from core.contracts.slots import GeometrySlots, SlotFrame
-from core.geometry.adapters import geometry_spec_to_runtime_geometry
+from core.geometry.adapters import geometry_spec_to_config_fragment, geometry_spec_to_runtime_geometry
 from core.geometry.catalog import get_geometry_catalog_entry, resolve_geometry_structure
 from core.geometry.compiler import (
     compile_geometry_spec_from_config,
@@ -107,6 +107,71 @@ class GeometryCompilerTests(unittest.TestCase):
         self.assertEqual(runtime_geometry["structure"], "single_tubs")
         self.assertEqual(runtime_geometry["radius"], 9.0)
         self.assertEqual(runtime_geometry["half_length"], 11.0)
+
+    def test_compile_single_orb_from_slot_frame(self) -> None:
+        frame = SlotFrame(confidence=0.84, geometry=GeometrySlots(kind="orb", radius_mm=22))
+        result = compile_geometry_spec_from_slot_frame(frame)
+
+        self.assertTrue(result.ok)
+        assert result.spec is not None
+        self.assertEqual(result.spec.structure, "single_orb")
+        self.assertEqual(result.spec.params["radius_mm"], 22.0)
+        self.assertEqual(result.spec.confidence, 0.84)
+
+    def test_compile_single_cons_from_config(self) -> None:
+        config = {
+            "geometry": {
+                "structure": "single_cons",
+                "params": {"rmax1": 5.0, "rmax2": 9.0, "child_hz": 12.0},
+            }
+        }
+        result = compile_geometry_spec_from_config(config)
+
+        self.assertTrue(result.ok)
+        assert result.spec is not None
+        self.assertEqual(result.spec.params["radius1_mm"], 5.0)
+        self.assertEqual(result.spec.params["radius2_mm"], 9.0)
+        self.assertEqual(result.spec.params["half_length_mm"], 12.0)
+
+    def test_compile_single_trd_from_semantic_frame(self) -> None:
+        frame = SemanticFrame(
+            geometry=GeometryFrame(
+                structure="single_trd",
+                params={"x1": 1.0, "x2": 2.0, "y1": 3.0, "y2": 4.0, "module_z": 5.0},
+            )
+        )
+        result = compile_geometry_spec_from_semantic_frame(frame)
+
+        self.assertTrue(result.ok)
+        assert result.spec is not None
+        self.assertEqual(result.spec.params["x1_mm"], 1.0)
+        self.assertEqual(result.spec.params["z_mm"], 5.0)
+
+    def test_geometry_spec_to_config_fragment_for_box(self) -> None:
+        frame = SlotFrame(confidence=0.9, geometry=GeometrySlots(kind="box", size_triplet_mm=[5, 6, 7]))
+        result = compile_geometry_spec_from_slot_frame(frame)
+
+        assert result.spec is not None
+        fragment = geometry_spec_to_config_fragment(result.spec)
+        self.assertEqual(fragment["geometry"]["structure"], "single_box")
+        self.assertEqual(fragment["geometry"]["params"]["module_x"], 5.0)
+        self.assertEqual(fragment["geometry"]["params"]["module_y"], 6.0)
+        self.assertEqual(fragment["geometry"]["params"]["module_z"], 7.0)
+
+    def test_geometry_spec_to_config_fragment_for_cons(self) -> None:
+        config = {
+            "geometry": {
+                "structure": "single_cons",
+                "params": {"rmax1": 5.0, "rmax2": 9.0, "child_hz": 12.0},
+            }
+        }
+        result = compile_geometry_spec_from_config(config)
+
+        assert result.spec is not None
+        fragment = geometry_spec_to_config_fragment(result.spec)
+        self.assertEqual(fragment["geometry"]["params"]["rmax1"], 5.0)
+        self.assertEqual(fragment["geometry"]["params"]["rmax2"], 9.0)
+        self.assertEqual(fragment["geometry"]["params"]["child_hz"], 12.0)
 
 
 if __name__ == "__main__":

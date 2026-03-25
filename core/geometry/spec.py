@@ -10,6 +10,7 @@ class GeometryEvidence:
     field: str
     value: Any
     confidence: float = 1.0
+    detail: str = ""
 
 
 @dataclass
@@ -28,4 +29,4 @@ class GeometrySpec:
     params: dict[str, float | list[float]]
     allowed_paths: frozenset[str] = field(default_factory=frozenset)
     required_paths: frozenset[str] = field(default_factory=frozenset)
-
+    confidence: float = 1.0

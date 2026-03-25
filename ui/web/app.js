@@ -57,6 +57,7 @@ const i18n = {
     runtime_log: "运行日志",
     process: "过程",
     internal_trace: "内部轨迹",
+    geometry_compare: "几何对比",
     thinking: "思考过程",
     thinking_hint: "我会实时告诉你当前正在处理什么，以及下一步准备推进到哪里。",
     request_failed: "请求失败，未能完成本轮渲染。",
@@ -152,6 +153,7 @@ const i18n = {
     runtime_log: "Runtime Log",
     process: "Process",
     internal_trace: "Internal Trace",
+    geometry_compare: "Geometry Compare",
     thinking: "Thinking",
     thinking_hint: "This panel updates live so you can see what is being processed now and what comes next.",
     request_failed: "The request failed before a response could be rendered.",
@@ -217,6 +219,7 @@ Object.assign(i18n.zh, {
   raw_runtime: "原始运行态",
   terminal_log: "终端日志",
   debug_panel: "调试信息",
+  geometry_compare: "几何对比",
 });
 
 Object.assign(i18n.en, {
@@ -228,6 +231,7 @@ Object.assign(i18n.en, {
   raw_runtime: "Raw Runtime",
   terminal_log: "Terminal",
   debug_panel: "Debug Panel",
+  geometry_compare: "Geometry Compare",
 });
 
 function t(key) {
@@ -633,6 +637,32 @@ function summarizeGeant4Log(payload) {
   return Array.isArray(lines) ? lines.join("\n") : JSON.stringify(payload, null, 2);
 }
 
+function summarizeGeometryCompare(compare) {
+  if (!compare) return "";
+  const mismatches = Array.isArray(compare.mismatches) ? compare.mismatches : [];
+  const lines = [
+    `compile_ok: ${compare.compile_ok === true ? "true" : "false"}`,
+    `matches: ${compare.matches === true ? "true" : "false"}`,
+    `spec_structure: ${compare.spec_structure || ""}`,
+    `finalization_status: ${compare.finalization_status || ""}`,
+  ];
+  if (Array.isArray(compare.errors) && compare.errors.length) {
+    lines.push(`errors: ${compare.errors.join(", ")}`);
+  }
+  if (Array.isArray(compare.missing_fields) && compare.missing_fields.length) {
+    lines.push(`missing_fields: ${compare.missing_fields.join(", ")}`);
+  }
+  if (mismatches.length) {
+    lines.push("mismatches:");
+    mismatches.slice(0, 12).forEach((item) => {
+      lines.push(`- ${item.field}: legacy=${JSON.stringify(item.legacy)} new=${JSON.stringify(item.new)}`);
+    });
+  } else {
+    lines.push("mismatches: none");
+  }
+  return lines.join("\n");
+}
+
 function buildRuntimeLogSummary(payload) {
   const lines = Array.isArray(payload?.lines)
     ? payload.lines
@@ -685,6 +715,7 @@ function updateDebugPanelVisibility() {
     ["debug-terminal-block", $("geant4-log")?.textContent],
     ["debug-process-block", $("process-log")?.textContent],
     ["debug-trace-block", $("internal-trace")?.textContent],
+    ["debug-geometry-block", $("geometry-compare")?.textContent],
     ["debug-config-block", $("response")?.textContent],
     ["debug-runtime-block", $("geant4-state")?.textContent],
   ];
@@ -964,6 +995,7 @@ async function sendStep() {
       violations: data.violations || [],
       applied_rules: data.applied_rules || [],
       internal_trace: data.internal_trace || null,
+      geometry_compare: data.geometry_compare || null,
     };
 
     $("summary").textContent = summarizeConfig(data.config);
@@ -971,6 +1003,7 @@ async function sendStep() {
     renderConfigInspector(data.config || {});
     $("process-log").textContent = summarizeProcess(state.lastProcess);
     $("internal-trace").textContent = summarizeInternalTrace(state.lastProcess.internal_trace);
+    $("geometry-compare").textContent = summarizeGeometryCompare(state.lastProcess.geometry_compare);
     updateDebugPanelVisibility();
     renderTopbar();
     await refreshGeant4State();
@@ -1001,6 +1034,7 @@ async function resetSession() {
   renderConfigInspector({});
   $("process-log").textContent = "";
   $("internal-trace").textContent = "";
+  $("geometry-compare").textContent = "";
   $("geant4-state").textContent = "";
   $("geant4-log").textContent = "";
   renderRuntimeLogSummary({});

@@ -93,7 +93,7 @@ npm install
 npm start
 ```
 
-This shell reuses the current `ui/web/` frontend and starts the Python runtime locally through `python -m ui.desktop.runtime_bridge`.
+This shell reuses the current `ui/web/` frontend and starts the Python runtime locally through `python -m ui.launch.runtime_bridge`.
 
 ## Archived Tooling
 
@@ -225,7 +225,7 @@ npm install
 npm start
 ```
 
-这一阶段会复用当前 `ui/web/` 前端，并通过 `python -m ui.desktop.runtime_bridge` 在本地拉起 Python 运行时。
+这一阶段会复用当前 `ui/web/` 前端，并通过 `python -m ui.launch.runtime_bridge` 在本地拉起 Python 运行时。
 
 ## LLM 提供方配置（Ollama / OpenAI 兼容）
 

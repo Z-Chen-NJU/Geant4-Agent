@@ -113,6 +113,9 @@ ui/desktop/node_modules/
 ui/desktop/dist/
 ui/desktop/out/
 ui/desktop/.vite/
+legacy/ui_desktop/node_modules/
+legacy/ui_desktop/dist/
+legacy/ui_desktop/out/
 
 # Ruff / mypy / pyre / pytype
 .ruff_cache/
@@ -164,6 +167,7 @@ scripts/
 legacy/tooling/
 legacy/programs/
 legacy/reports/
+legacy/ui_desktop/.vite/
 scripts/__pycache__/
 legacy/**/__pycache__/
 

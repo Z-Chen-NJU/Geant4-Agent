@@ -14,6 +14,7 @@ from core.runtime.types import (
     RuntimeActionStatus,
     RuntimeStateSnapshot,
 )
+from mcp.geant4.runtime_payload import build_runtime_payload
 
 
 def _deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
@@ -158,6 +159,7 @@ class LocalProcessGeant4Adapter(Geant4RuntimeAdapter):
         self._geant4_root = Path(geant4_root)
         self._working_dir = working_dir
         self._config: dict[str, Any] = {}
+        self._runtime_payload: dict[str, Any] = {}
         self._last_log: list[str] = []
         self._snapshot = RuntimeStateSnapshot(
             connected=bool(self._command),
@@ -175,6 +177,7 @@ class LocalProcessGeant4Adapter(Geant4RuntimeAdapter):
 
     def apply_config_patch(self, patch: dict[str, Any]) -> ExecutionObservation:
         self._config = _deep_merge(self._config, patch)
+        self._runtime_payload = build_runtime_payload(self._config)
         self._snapshot.geometry_ready = bool(self._config.get("geometry"))
         self._snapshot.source_ready = bool(self._config.get("source"))
         self._snapshot.physics_ready = bool(self._config.get("physics_list") or self._config.get("physics"))
@@ -190,7 +193,10 @@ class LocalProcessGeant4Adapter(Geant4RuntimeAdapter):
         return ExecutionObservation(
             status=RuntimeActionStatus.COMPLETED,
             message="Configuration patch applied.",
-            payload={"config": deepcopy(self._config)},
+            payload={
+                "config": deepcopy(self._config),
+                "runtime_payload": deepcopy(self._runtime_payload),
+            },
             runtime_phase=self._snapshot.runtime_phase,
         )
 
@@ -247,7 +253,7 @@ class LocalProcessGeant4Adapter(Geant4RuntimeAdapter):
             ) as handle:
                 import json
 
-                json.dump(self._config, handle, ensure_ascii=True, indent=2)
+                json.dump(self._runtime_payload or build_runtime_payload(self._config), handle, ensure_ascii=True, indent=2)
                 config_path = handle.name
 
             completed = subprocess.run(

@@ -10,6 +10,7 @@ from typing import Any
 
 from core.runtime.types import ToolCallRequest
 from mcp.geant4.adapter import InMemoryGeant4Adapter, LocalProcessGeant4Adapter
+from mcp.geant4.runtime_payload import build_runtime_payload
 from mcp.geant4.server import Geant4McpServer
 
 
@@ -59,6 +60,7 @@ def handle_geant4_post(path: str, payload: dict[str, Any]) -> tuple[int, dict[st
 
     if path == "/api/geant4/viewer/open":
         patch = dict(payload.get("patch", {}))
+        runtime_payload = build_runtime_payload(patch)
         adapter = server._adapter  # type: ignore[attr-defined]
         if not isinstance(adapter, LocalProcessGeant4Adapter):
             return 400, {
@@ -74,7 +76,7 @@ def handle_geant4_post(path: str, payload: dict[str, Any]) -> tuple[int, dict[st
             delete=False,
             encoding="utf-8",
         ) as handle:
-            json.dump(patch, handle, ensure_ascii=True, indent=2)
+            json.dump(runtime_payload, handle, ensure_ascii=True, indent=2)
             config_path = handle.name
 
         completed = subprocess.run(

@@ -1,13 +1,17 @@
 ﻿from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
-from core.config.field_registry import friendly_labels
-from core.config.phase_registry import phase_title, select_phase_fields
-from core.config.prompt_registry import clarification_fallback, completion_message
-from nlu.llm_support.llm_bridge import build_missing_params_prompt, build_missing_params_schema
-from planner.agent import ask_missing
+from core.config.phase_registry import phase_title
+from core.config.prompt_registry import completion_message
+from ui.web.legacy_dialogue import (
+    ask_for_missing as _ask_llm,
+    diff_paths as _diff_paths,
+    friendly_fields as _friendly_fields,
+    is_complete as _is_complete,
+    select_phase_and_fields as _select_phase_fields,
+)
 from ui.web.legacy_knowledge import (
     is_physics_recommend_request as _is_physics_recommend_request,
     load_knowledge,
@@ -33,96 +37,10 @@ from ui.web.legacy_session import (
     ensure_session as _ensure_session,
     extract_semantic_frame_legacy as _extract_semantic_frame_legacy,
 )
+from ui.web.legacy_solver import solve_payload
 from ui.web.runtime_state import get_ollama_config_path
 
 KNOWLEDGE = load_knowledge()
-
-
-def _is_missing_value(value: Any) -> bool:
-    if value is None:
-        return True
-    if isinstance(value, str) and not value.strip():
-        return True
-    if isinstance(value, (dict, list)) and len(value) == 0:
-        return True
-    return False
-
-
-def _collect_required_missing(schema: Dict[str, Any], obj: Any, prefix: str = "") -> List[str]:
-    missing: List[str] = []
-    if not isinstance(schema, dict):
-        return missing
-    if schema.get("type") != "object":
-        return missing
-
-    props = schema.get("properties", {})
-    required = schema.get("required", [])
-    value = obj if isinstance(obj, dict) else {}
-
-    for key in required:
-        path = f"{prefix}.{key}" if prefix else key
-        if key not in value or _is_missing_value(value.get(key)):
-            missing.append(path)
-
-    for key, sub_schema in props.items():
-        if key in value and value.get(key) is not None:
-            path = f"{prefix}.{key}" if prefix else key
-            missing.extend(_collect_required_missing(sub_schema, value.get(key), path))
-
-    return missing
-
-
-def _select_phase_fields(missing_fields: List[str]) -> Tuple[str, List[str]]:
-    return select_phase_fields(missing_fields)
-
-
-def _friendly_fields(fields: List[str], lang: str) -> List[str]:
-    return friendly_labels(fields, lang)
-
-
-def _is_complete(config: Dict[str, Any], missing_fields: List[str]) -> bool:
-    if missing_fields:
-        return False
-    feasible = config.get("geometry", {}).get("feasible")
-    if feasible is False:
-        return False
-    return True
-
-
-def _flatten(obj: Any, prefix: str = "") -> Dict[str, Any]:
-    out: Dict[str, Any] = {}
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            p = f"{prefix}.{k}" if prefix else k
-            out.update(_flatten(v, p))
-        return out
-    out[prefix] = obj
-    return out
-
-
-def _diff_paths(before: Dict[str, Any], after: Dict[str, Any]) -> List[str]:
-    b = _flatten(before)
-    a = _flatten(after)
-    keys = sorted(set(b.keys()) | set(a.keys()))
-    changed: List[str] = []
-    for k in keys:
-        if b.get(k) != a.get(k):
-            changed.append(k)
-    return changed
-
-
-def _ask_llm(
-    asked_fields: List[str],
-    asked_fields_friendly: List[str],
-    history: List[Dict[str, str]],
-    lang: str,
-    use_llm: bool = True,
-) -> str:
-    if not asked_fields:
-        return ""
-    if not use_llm:
-        return clarification_fallback(asked_fields_friendly, lang)
-    return ask_missing(asked_fields, lang, get_ollama_config_path(), temperature=1.0)
 
 
 def legacy_step(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -274,111 +192,17 @@ def legacy_solve(payload: Dict[str, Any]) -> Dict[str, Any]:
     text = str(payload.get("text", "")).strip()
     if not text:
         return {"error": "missing text"}
-
-    top_k = int(payload.get("top_k", 1))
-    min_conf = float(payload.get("min_confidence", 0.6))
-    normalize_input = bool(payload.get("normalize_input", True))
-    prompt_format = payload.get("prompt_format", "json_schema")
-    autofix = bool(payload.get("autofix", False))
-    llm_fill = bool(payload.get("llm_fill_missing", False))
-    params_override = payload.get("params_override", {}) or {}
-
-    frame, debug = _extract_semantic_frame_legacy(
-        text,
-        min_confidence=min_conf,
-        device="auto",
-        normalize_with_llm=normalize_input,
-        normalize_config_path=get_ollama_config_path(),
-        context_summary="",
+    return solve_payload(
+        text=text,
+        top_k=int(payload.get("top_k", 1)),
+        min_confidence=float(payload.get("min_confidence", 0.6)),
+        normalize_input=bool(payload.get("normalize_input", True)),
+        prompt_format=str(payload.get("prompt_format", "json_schema")),
+        autofix=bool(payload.get("autofix", False)),
+        llm_fill_missing=bool(payload.get("llm_fill_missing", False)),
+        params_override=payload.get("params_override", {}) or {},
+        extract_semantic_frame=_extract_semantic_frame_legacy,
     )
-    if bool(debug.get("requires_llm_normalization", False)):
-        return {
-            "structure": "unknown",
-            "inference_backend": debug.get("inference_backend", "deferred_non_english"),
-            "normalized_text": debug.get("normalized_text", text),
-            "normalization": debug.get("normalization", {}),
-            "normalization_degraded": bool(debug.get("normalization_degraded", False)),
-            "requires_llm_normalization": True,
-            "scores": {},
-            "params": {},
-            "notes": list(frame.notes),
-            "synthesis": {"error": "requires_llm_normalization"},
-            "missing_prompt": "",
-            "missing_schema": None,
-            "candidates": [],
-            "best_candidate": None,
-        }
-    structure = frame.geometry.structure or "unknown"
-    params = dict(frame.geometry.params)
-    params.update(params_override)
-    notes = list(frame.notes)
-    scores = debug.get("scores", {})
-    ranked = debug.get("ranked", [])
-
-    candidates = []
-    for name, prob in ranked[: max(1, top_k)]:
-        if prob < min_conf:
-            continue
-        synth = synthesize_from_params(name, params, seed=7, apply_autofix=autofix)
-        missing = synth.get("missing_params", [])
-        prompt = build_missing_params_prompt(name, missing, fmt=prompt_format)
-        schema = build_missing_params_schema(name, missing) if prompt_format == "json_schema" else None
-        filled = None
-        if llm_fill and missing:
-            resp = chat(prompt, config_path=get_ollama_config_path(), temperature=0.2)
-            parsed = extract_json(resp.get("response", ""))
-            if isinstance(parsed, dict):
-                merged = dict(params)
-                merged.update(parsed)
-                filled = synthesize_from_params(name, merged, seed=7, apply_autofix=autofix)
-        candidates.append(
-            {
-                "structure": name,
-                "prob": prob,
-                "synthesis": synth,
-                "synthesis_filled": filled,
-                "missing_prompt": prompt,
-                "missing_schema": schema,
-            }
-        )
-
-    if structure == "unknown":
-        synthesis = {"error": "structure confidence below threshold"}
-        missing_prompt = ""
-        missing_schema = None
-    else:
-        synthesis = synthesize_from_params(structure, params, seed=7, apply_autofix=autofix)
-        missing = synthesis.get("missing_params", [])
-        missing_prompt = build_missing_params_prompt(structure, missing, fmt=prompt_format)
-        missing_schema = build_missing_params_schema(structure, missing) if prompt_format == "json_schema" else None
-
-    def _cand_score(c):
-        synth = c.get("synthesis", {})
-        feasible = bool(synth.get("feasible"))
-        missing_n = len(synth.get("missing_params", []))
-        errors_n = len(synth.get("errors", []))
-        return (1 if feasible else 0, -missing_n, -errors_n, c.get("prob", 0.0))
-
-    best = None
-    if candidates:
-        best = sorted(candidates, key=_cand_score, reverse=True)[0]
-
-    return {
-        "structure": structure,
-        "inference_backend": debug.get("inference_backend", "dual_model"),
-        "normalized_text": debug.get("normalized_text", text),
-        "normalization": debug.get("normalization", {}),
-        "normalization_degraded": bool(debug.get("normalization_degraded", False)),
-        "scores": scores,
-        "params": params,
-        "notes": notes,
-        "synthesis": synthesis,
-        "missing_prompt": missing_prompt,
-        "missing_schema": missing_schema,
-        "candidates": candidates,
-        "graph_candidates": debug.get("graph_candidates", []),
-        "best_candidate": best,
-    }
 
 
 

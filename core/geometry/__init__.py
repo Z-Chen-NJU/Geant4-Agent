@@ -6,9 +6,11 @@ from core.geometry.catalog import (
     resolve_geometry_structure,
 )
 from core.geometry.adapters import (
+    compare_slot_frame_geometry,
     diff_geometry_config_fragment,
     geometry_spec_to_config_fragment,
     geometry_spec_to_runtime_geometry,
+    legacy_geometry_from_candidate,
 )
 from core.geometry.compiler import (
     GeometryCompileResult,
@@ -34,10 +36,12 @@ __all__ = [
     "compile_geometry_spec_from_config",
     "compile_geometry_spec_from_semantic_frame",
     "compile_geometry_spec_from_slot_frame",
+    "compare_slot_frame_geometry",
     "diff_geometry_config_fragment",
     "geometry_spec_to_config_fragment",
     "geometry_spec_to_runtime_geometry",
     "get_geometry_catalog_entry",
     "iter_geometry_catalog",
+    "legacy_geometry_from_candidate",
     "resolve_geometry_structure",
 ]

@@ -5,6 +5,7 @@ import unittest
 from core.contracts.semantic import GeometryFrame, SemanticFrame
 from core.contracts.slots import GeometrySlots, SlotFrame
 from core.geometry.adapters import (
+    compare_slot_frame_geometry,
     diff_geometry_config_fragment,
     geometry_spec_to_config_fragment,
     geometry_spec_to_runtime_geometry,
@@ -206,6 +207,16 @@ class GeometryCompilerTests(unittest.TestCase):
         diff = diff_geometry_config_fragment(result.spec, legacy_geometry)
         self.assertFalse(diff["matches"])
         self.assertEqual(diff["mismatches"][0]["field"], "geometry.params.module_z")
+
+    def test_compare_slot_frame_geometry_reports_match_for_box(self) -> None:
+        frame = SlotFrame(confidence=0.9, geometry=GeometrySlots(kind="box", size_triplet_mm=[5, 6, 7]))
+        comparison = compare_slot_frame_geometry(frame, turn_id=1)
+
+        self.assertIsNotNone(comparison)
+        assert comparison is not None
+        self.assertTrue(comparison["compile_ok"])
+        self.assertTrue(comparison["matches"])
+        self.assertEqual(comparison["spec_structure"], "single_box")
 
 
 if __name__ == "__main__":

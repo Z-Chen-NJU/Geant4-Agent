@@ -76,6 +76,8 @@ def handle_geant4_post(path: str, payload: dict[str, Any]) -> tuple[int, dict[st
             delete=False,
             encoding="utf-8",
         ) as handle:
+            runtime_payload = dict(runtime_payload)
+            runtime_payload.pop("raw_config", None)
             json.dump(runtime_payload, handle, ensure_ascii=True, indent=2)
             config_path = handle.name
 

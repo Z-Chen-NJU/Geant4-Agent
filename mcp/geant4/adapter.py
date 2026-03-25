@@ -253,7 +253,9 @@ class LocalProcessGeant4Adapter(Geant4RuntimeAdapter):
             ) as handle:
                 import json
 
-                json.dump(self._runtime_payload or build_runtime_payload(self._config), handle, ensure_ascii=True, indent=2)
+                runtime_payload = deepcopy(self._runtime_payload or build_runtime_payload(self._config))
+                runtime_payload.pop("raw_config", None)
+                json.dump(runtime_payload, handle, ensure_ascii=True, indent=2)
                 config_path = handle.name
 
             completed = subprocess.run(

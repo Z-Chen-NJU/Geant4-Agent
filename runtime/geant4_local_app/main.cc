@@ -34,6 +34,7 @@ struct RuntimeConfig {
   std::string geometry_structure = "single_box";
   std::string material = "G4_Cu";
   std::string particle = "gamma";
+  std::string source_type = "point";
   double energy_mev = 1.0;
   double source_x_mm = 0.0;
   double source_y_mm = 0.0;
@@ -62,8 +63,10 @@ std::string read_text(const fs::path& path) {
   return buffer.str();
 }
 
-std::string extract_string(const std::string& text, const std::string& key, const std::string& fallback) {
-  const std::regex pattern("\"" + key + "\"\\s*:\\s*\"([^\"]+)\"", std::regex::icase);
+std::string extract_top_level_string(const std::string& text, const std::string& key, const std::string& fallback) {
+  const std::regex pattern(
+      "(?:^|[\\r\\n])\\s*\"" + key + "\"\\s*:\\s*\"([^\"]+)\"",
+      std::regex::icase);
   std::smatch match;
   if (std::regex_search(text, match, pattern) && match.size() >= 2) {
     return match[1].str();
@@ -71,8 +74,10 @@ std::string extract_string(const std::string& text, const std::string& key, cons
   return fallback;
 }
 
-double extract_number(const std::string& text, const std::string& key, double fallback) {
-  const std::regex pattern("\"" + key + "\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?)", std::regex::icase);
+double extract_top_level_number(const std::string& text, const std::string& key, double fallback) {
+  const std::regex pattern(
+      "(?:^|[\\r\\n])\\s*\"" + key + "\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?)",
+      std::regex::icase);
   std::smatch match;
   if (std::regex_search(text, match, pattern) && match.size() >= 2) {
     return std::stod(match[1].str());
@@ -80,13 +85,14 @@ double extract_number(const std::string& text, const std::string& key, double fa
   return fallback;
 }
 
-double extract_nested_number(
+double extract_top_level_object_number(
     const std::string& text,
     const std::string& object_key,
     const std::string& key,
     double fallback) {
   const std::regex pattern(
-      "\"" + object_key + "\"\\s*:\\s*\\{[^\\}]*?\"" + key + "\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?)",
+      "(?:^|[\\r\\n])\\s*\"" + object_key +
+          "\"\\s*:\\s*\\{[^\\}]*?\"" + key + "\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?)",
       std::regex::icase);
   std::smatch match;
   if (std::regex_search(text, match, pattern) && match.size() >= 2) {
@@ -101,23 +107,23 @@ RuntimeConfig load_runtime_config(const fs::path& config_path, int events, const
   cfg.artifact_dir = artifact_dir.string();
 
   const auto text = read_text(config_path);
-  cfg.geometry_structure = extract_string(text, "structure", cfg.geometry_structure);
-  cfg.material = extract_string(text, "material", cfg.material);
-  cfg.particle = extract_string(text, "particle", cfg.particle);
-  cfg.physics_list = extract_string(text, "physics_list", cfg.physics_list);
-  cfg.physics_list = extract_string(text, "name", cfg.physics_list);
-  cfg.energy_mev = extract_number(text, "energy", cfg.energy_mev);
-  cfg.source_x_mm = extract_nested_number(text, "position", "x", cfg.source_x_mm);
-  cfg.source_y_mm = extract_nested_number(text, "position", "y", cfg.source_y_mm);
-  cfg.source_z_mm = extract_nested_number(text, "position", "z", cfg.source_z_mm);
-  cfg.direction_x = extract_nested_number(text, "direction", "x", cfg.direction_x);
-  cfg.direction_y = extract_nested_number(text, "direction", "y", cfg.direction_y);
-  cfg.direction_z = extract_nested_number(text, "direction", "z", cfg.direction_z);
-  cfg.size_x_mm = extract_number(text, "size_x", cfg.size_x_mm);
-  cfg.size_y_mm = extract_number(text, "size_y", cfg.size_y_mm);
-  cfg.size_z_mm = extract_number(text, "size_z", cfg.size_z_mm);
-  cfg.radius_mm = extract_number(text, "radius", cfg.radius_mm);
-  cfg.half_length_mm = extract_number(text, "half_length", cfg.half_length_mm);
+  cfg.geometry_structure = extract_top_level_string(text, "structure", cfg.geometry_structure);
+  cfg.material = extract_top_level_string(text, "material", cfg.material);
+  cfg.particle = extract_top_level_string(text, "particle", cfg.particle);
+  cfg.source_type = extract_top_level_string(text, "source_type", cfg.source_type);
+  cfg.physics_list = extract_top_level_string(text, "physics_list", cfg.physics_list);
+  cfg.energy_mev = extract_top_level_number(text, "energy", cfg.energy_mev);
+  cfg.source_x_mm = extract_top_level_object_number(text, "position", "x", cfg.source_x_mm);
+  cfg.source_y_mm = extract_top_level_object_number(text, "position", "y", cfg.source_y_mm);
+  cfg.source_z_mm = extract_top_level_object_number(text, "position", "z", cfg.source_z_mm);
+  cfg.direction_x = extract_top_level_object_number(text, "direction", "x", cfg.direction_x);
+  cfg.direction_y = extract_top_level_object_number(text, "direction", "y", cfg.direction_y);
+  cfg.direction_z = extract_top_level_object_number(text, "direction", "z", cfg.direction_z);
+  cfg.size_x_mm = extract_top_level_number(text, "size_x", cfg.size_x_mm);
+  cfg.size_y_mm = extract_top_level_number(text, "size_y", cfg.size_y_mm);
+  cfg.size_z_mm = extract_top_level_number(text, "size_z", cfg.size_z_mm);
+  cfg.radius_mm = extract_top_level_number(text, "radius", cfg.radius_mm);
+  cfg.half_length_mm = extract_top_level_number(text, "half_length", cfg.half_length_mm);
   return cfg;
 }
 
@@ -315,6 +321,7 @@ int main(int argc, char** argv) {
           << "  \"geometry_structure\": \"" << cfg.geometry_structure << "\",\n"
           << "  \"material\": \"" << cfg.material << "\",\n"
           << "  \"particle\": \"" << cfg.particle << "\",\n"
+          << "  \"source_type\": \"" << cfg.source_type << "\",\n"
           << "  \"source_position_mm\": [" << cfg.source_x_mm << ", " << cfg.source_y_mm << ", " << cfg.source_z_mm
           << "],\n"
           << "  \"source_direction\": [" << cfg.direction_x << ", " << cfg.direction_y << ", " << cfg.direction_z

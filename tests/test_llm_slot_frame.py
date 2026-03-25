@@ -577,6 +577,45 @@ class LlmSlotFrameTest(unittest.TestCase):
         self.assertIn("source.position_mm", result.stage_trace.get("raw_text_backfill_fields", []))
         self.assertIn("source.direction_vec", result.stage_trace.get("raw_text_backfill_fields", []))
 
+    def test_build_llm_slot_frame_backfills_relative_source_from_center(self) -> None:
+        llm_payload = {
+            "intent": "SET",
+            "confidence": 0.85,
+            "normalized_text": (
+                "geometry.kind:box; geometry.size_triplet_mm:(10,10,10); materials.primary:copper; "
+                "source.kind:point; source.particle:gamma; source.energy_mev:1000; output.format:json"
+            ),
+            "target_slots": [
+                "geometry.kind",
+                "geometry.size_triplet_mm",
+                "materials.primary",
+                "source.kind",
+                "source.particle",
+                "source.energy_mev",
+                "source.position_mm",
+                "source.direction_vec",
+                "output.format",
+            ],
+            "slots": {
+                "geometry": {"kind": "box", "size_triplet_mm": [10, 10, 10]},
+                "materials": {"primary": "copper"},
+                "source": {"kind": "point", "particle": "gamma", "energy_mev": 1000},
+                "output": {"format": "json"},
+            },
+        }
+        with patch("nlu.llm.slot_frame.chat", return_value={"response": json.dumps(llm_payload)}):
+            result = build_llm_slot_frame(
+                "铜靶，10mm立方体，gamma粒子从中心点20mm外入射，点源，1GeV，输出格式为json。",
+                context_summary="phase=source",
+                config_path="",
+            )
+        self.assertTrue(result.ok)
+        assert result.frame is not None
+        self.assertEqual(result.frame.source.position_mm, [0.0, 0.0, -20.0])
+        self.assertEqual(result.frame.source.direction_vec, [0.0, 0.0, 1.0])
+        self.assertIn("source.position_mm", result.stage_trace.get("raw_text_backfill_fields", []))
+        self.assertIn("source.direction_vec", result.stage_trace.get("raw_text_backfill_fields", []))
+
     def test_build_llm_slot_frame_prefers_beam_over_pointing_token(self) -> None:
         llm_payload = {
             "intent": "SET",

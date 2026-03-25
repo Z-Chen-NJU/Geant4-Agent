@@ -773,6 +773,31 @@ def _source_position_from_phrase(text: str) -> list[float] | None:
     return None
 
 
+def _source_relative_to_center_phrase(text: str) -> tuple[list[float], list[float]] | None:
+    patterns = [
+        r"(?:from\s+)?(?:the\s+)?center(?:\s+point)?\s*(?:by|at|from)?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)\s*(?:outside|away)(?:\s+along\s*([+-][xyz]))?",
+        r"(?:from\s+)?(?:the\s+)?center(?:\s+point)?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)\s*(?:outside|away)(?:\s+along\s*([+-][xyz]))?",
+        r"(?:中心(?:点)?)\s*([-+]?\d*\.?\d+)\s*(毫米|厘米|米|mm|cm|m)\s*外(?:\s*(?:沿|朝)\s*([+-][xyz]))?",
+        r"(?:距(?:离)?中心(?:点)?)\s*([-+]?\d*\.?\d+)\s*(毫米|厘米|米|mm|cm|m)(?:\s*外)?(?:\s*(?:沿|朝)\s*([+-][xyz]))?",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if not match:
+            continue
+        distance_mm = _to_mm(float(match.group(1)), match.group(2))
+        axis = (match.group(3) or "-z").lower()
+        axis_map = {
+            "+x": ([distance_mm, 0.0, 0.0], [-1.0, 0.0, 0.0]),
+            "-x": ([-distance_mm, 0.0, 0.0], [1.0, 0.0, 0.0]),
+            "+y": ([0.0, distance_mm, 0.0], [0.0, -1.0, 0.0]),
+            "-y": ([0.0, -distance_mm, 0.0], [0.0, 1.0, 0.0]),
+            "+z": ([0.0, 0.0, distance_mm], [0.0, 0.0, -1.0]),
+            "-z": ([0.0, 0.0, -distance_mm], [0.0, 0.0, 1.0]),
+        }
+        return axis_map.get(axis, axis_map["-z"])
+    return None
+
+
 def _source_direction_from_phrase(text: str) -> list[float] | None:
     patterns = [
         r"(?:direction|pointing)\s*(?:=|:)?\s*(\(\s*[-+]?\d*\.?\d+\s*,\s*[-+]?\d*\.?\d+\s*,\s*[-+]?\d*\.?\d+\s*\))",
@@ -1279,6 +1304,14 @@ def _backfill_from_user_text(frame: SlotFrame, user_text: str) -> None:
         position = _source_position_from_phrase(text)
         if position is not None:
             frame.source.position_mm = position
+
+    if frame.source.position_mm is None or frame.source.direction_vec is None:
+        relative = _source_relative_to_center_phrase(text)
+        if relative is not None:
+            if frame.source.position_mm is None:
+                frame.source.position_mm = relative[0]
+            if frame.source.direction_vec is None:
+                frame.source.direction_vec = relative[1]
 
     if frame.source.direction_vec is None:
         direction = _source_direction_from_phrase(text)

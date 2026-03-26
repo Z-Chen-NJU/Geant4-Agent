@@ -46,10 +46,11 @@ def validate_source_intent(intent: SourceIntent, entry: SourceCatalogEntry) -> S
         elif _vector_norm(direction) == 0:
             errors.append("zero_direction")
 
-    if intent.source_type == "beam" and direction is None:
-        errors.append("beam_requires_direction")
-    if intent.source_type in {"isotropic", "plane"} and direction is not None:
-        warnings.append(f"direction_ignored_for_{intent.source_type}")
+    if "direction_vec" in entry.required_fields and direction is None:
+        errors.append(f"{entry.source_type}_requires_direction")
+    for ignored_field in entry.ignored_fields:
+        if ignored_field == "direction_vec" and direction is not None:
+            warnings.append(f"direction_ignored_for_{entry.source_type}")
     if not entry.supported_in_runtime:
         warnings.append(f"runtime_not_supported:{entry.source_type}")
 

@@ -71,6 +71,23 @@ class SourceCompilerTests(unittest.TestCase):
         self.assertEqual(result.spec.finalization_status, "review")
         self.assertIn("runtime_not_supported:isotropic", result.spec.validation_warnings)
 
+    def test_compile_isotropic_warns_when_direction_is_provided(self) -> None:
+        frame = SlotFrame(
+            confidence=0.9,
+            source=SourceSlots(
+                kind="isotropic",
+                particle="gamma",
+                energy_mev=1.0,
+                position_mm=[0.0, 0.0, 0.0],
+                direction_vec=[0.0, 0.0, 1.0],
+            ),
+        )
+        result = compile_source_spec_from_slot_frame(frame)
+        self.assertTrue(result.ok)
+        assert result.spec is not None
+        self.assertEqual(result.spec.finalization_status, "review")
+        self.assertIn("direction_ignored_for_isotropic", result.spec.validation_warnings)
+
     def test_compile_point_from_config(self) -> None:
         config = {
             "source": {
@@ -177,6 +194,20 @@ class SourceCompilerTests(unittest.TestCase):
         result = compile_source_spec_from_slot_frame(frame)
         self.assertFalse(result.ok)
         self.assertIn("zero_direction", result.errors)
+
+    def test_compile_plane_requires_direction(self) -> None:
+        frame = SlotFrame(
+            confidence=0.92,
+            source=SourceSlots(
+                kind="plane",
+                particle="gamma",
+                energy_mev=1.0,
+                position_mm=[0.0, 0.0, -20.0],
+            ),
+        )
+        result = compile_source_spec_from_slot_frame(frame)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.missing_fields, ("direction_vec",))
 
     def test_compile_point_tracks_provenance_summary(self) -> None:
         frame = SlotFrame(

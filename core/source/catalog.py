@@ -55,6 +55,7 @@ class SourceCatalogEntry:
     kind_aliases: tuple[str, ...]
     fields: tuple[SourceFieldDefinition, ...]
     required_fields: tuple[str, ...]
+    ignored_fields: tuple[str, ...] = field(default_factory=tuple)
     supported_in_runtime: bool = True
     description: str = ""
 
@@ -145,6 +146,7 @@ _SOURCE_CATALOG: tuple[SourceCatalogEntry, ...] = (
             _COMMON_FIELDS["direction_vec"],
         ),
         required_fields=("particle", "energy_mev", "position_mm"),
+        ignored_fields=("direction_vec",),
         supported_in_runtime=False,
         description="Isotropic source centered at a position.",
     ),
@@ -157,7 +159,7 @@ _SOURCE_CATALOG: tuple[SourceCatalogEntry, ...] = (
             _COMMON_FIELDS["position_mm"],
             _COMMON_FIELDS["direction_vec"],
         ),
-        required_fields=("particle", "energy_mev", "position_mm"),
+        required_fields=("particle", "energy_mev", "position_mm", "direction_vec"),
         supported_in_runtime=False,
         description="Plane source placeholder for future runtime expansion.",
     ),

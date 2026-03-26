@@ -42,3 +42,6 @@ class GeometrySpec:
     confidence: float = 1.0
     finalization_status: str = "ready"
     field_resolutions: dict[str, GeometryFieldResolution] = field(default_factory=dict)
+    provenance_summary: dict[str, int] = field(default_factory=dict)
+    validation_errors: tuple[str, ...] = field(default_factory=tuple)
+    validation_warnings: tuple[str, ...] = field(default_factory=tuple)

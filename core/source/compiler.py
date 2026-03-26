@@ -7,6 +7,7 @@ from core.contracts.semantic import SemanticFrame
 from core.contracts.slots import SlotFrame
 from core.source.catalog import SourceCatalogEntry, get_source_catalog_entry, resolve_source_type
 from core.source.spec import SourceEvidence, SourceFieldResolution, SourceIntent, SourceSpec
+from core.source.validator import validate_source_intent
 
 
 @dataclass(frozen=True)
@@ -15,6 +16,7 @@ class SourceCompileResult:
     spec: SourceSpec | None
     missing_fields: tuple[str, ...] = field(default_factory=tuple)
     errors: tuple[str, ...] = field(default_factory=tuple)
+    warnings: tuple[str, ...] = field(default_factory=tuple)
 
     @property
     def ok(self) -> bool:
@@ -174,14 +176,20 @@ def compile_source_intent(intent: SourceIntent) -> SourceCompileResult:
             missing_fields.append(field_def.name)
     if missing_fields:
         return SourceCompileResult(intent=intent, spec=None, missing_fields=tuple(missing_fields))
+    validation = validate_source_intent(intent, entry)
+    if validation.status == "invalid":
+        return SourceCompileResult(intent=intent, spec=None, errors=validation.errors, warnings=validation.warnings)
     spec = SourceSpec(
         source_type=entry.source_type,
         fields=dict(intent.fields),
         confidence=max((item.confidence for item in intent.evidence), default=1.0),
-        finalization_status="ready" if not intent.ambiguities else "ambiguous",
+        finalization_status=validation.status,
         field_resolutions=dict(intent.field_resolutions),
+        provenance_summary=dict(validation.provenance_summary),
+        validation_errors=validation.errors,
+        validation_warnings=validation.warnings,
     )
-    return SourceCompileResult(intent=intent, spec=spec)
+    return SourceCompileResult(intent=intent, spec=spec, warnings=validation.warnings)
 
 
 def compile_source_spec_from_slot_frame(frame: SlotFrame) -> SourceCompileResult:

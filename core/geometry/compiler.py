@@ -8,6 +8,7 @@ from core.contracts.slots import SlotFrame
 
 from core.geometry.catalog import GeometryCatalogEntry, get_geometry_catalog_entry, resolve_geometry_structure
 from core.geometry.spec import GeometryEvidence, GeometryFieldResolution, GeometryIntent, GeometrySpec
+from core.geometry.validator import validate_geometry_intent
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class GeometryCompileResult:
     spec: GeometrySpec | None
     missing_fields: tuple[str, ...] = field(default_factory=tuple)
     errors: tuple[str, ...] = field(default_factory=tuple)
+    warnings: tuple[str, ...] = field(default_factory=tuple)
 
     @property
     def ok(self) -> bool:
@@ -274,16 +276,28 @@ def compile_geometry_intent(intent: GeometryIntent) -> GeometryCompileResult:
             missing_fields=tuple(missing_fields),
         )
 
+    validation = validate_geometry_intent(intent, entry)
+    if validation.status == "invalid":
+        return GeometryCompileResult(
+            intent=intent,
+            spec=None,
+            errors=validation.errors,
+            warnings=validation.warnings,
+        )
+
     spec = GeometrySpec(
         structure=entry.structure,
         params=dict(intent.params),
         allowed_paths=entry.allowed_paths,
         required_paths=entry.required_paths,
         confidence=max((item.confidence for item in intent.evidence), default=1.0),
-        finalization_status="ready" if not intent.ambiguities else "ambiguous",
+        finalization_status=validation.status,
         field_resolutions=dict(intent.field_resolutions),
+        provenance_summary=dict(validation.provenance_summary),
+        validation_errors=validation.errors,
+        validation_warnings=validation.warnings,
     )
-    return GeometryCompileResult(intent=intent, spec=spec)
+    return GeometryCompileResult(intent=intent, spec=spec, warnings=validation.warnings)
 
 
 def compile_geometry_spec_from_slot_frame(frame: SlotFrame) -> GeometryCompileResult:

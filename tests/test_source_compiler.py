@@ -68,6 +68,8 @@ class SourceCompilerTests(unittest.TestCase):
         assert result.spec is not None
         self.assertEqual(result.spec.source_type, "isotropic")
         self.assertEqual(result.spec.fields["energy_mev"], 0.8)
+        self.assertEqual(result.spec.finalization_status, "review")
+        self.assertIn("runtime_not_supported:isotropic", result.spec.validation_warnings)
 
     def test_compile_point_from_config(self) -> None:
         config = {
@@ -160,6 +162,36 @@ class SourceCompilerTests(unittest.TestCase):
         self.assertTrue(comparison["compile_ok"])
         self.assertTrue(comparison["matches"])
         self.assertEqual(comparison["spec_source_type"], "point")
+
+    def test_compile_beam_rejects_zero_direction(self) -> None:
+        frame = SlotFrame(
+            confidence=0.92,
+            source=SourceSlots(
+                kind="beam",
+                particle="gamma",
+                energy_mev=1.0,
+                position_mm=[0.0, 0.0, -20.0],
+                direction_vec=[0.0, 0.0, 0.0],
+            ),
+        )
+        result = compile_source_spec_from_slot_frame(frame)
+        self.assertFalse(result.ok)
+        self.assertIn("zero_direction", result.errors)
+
+    def test_compile_point_tracks_provenance_summary(self) -> None:
+        frame = SlotFrame(
+            confidence=0.91,
+            source=SourceSlots(
+                kind="point",
+                particle="gamma",
+                energy_mev=1.0,
+                position_mm=[0.0, 0.0, -20.0],
+            ),
+        )
+        result = compile_source_spec_from_slot_frame(frame)
+        self.assertTrue(result.ok)
+        assert result.spec is not None
+        self.assertGreaterEqual(result.spec.provenance_summary.get("user_explicit", 0), 3)
 
 
 if __name__ == "__main__":

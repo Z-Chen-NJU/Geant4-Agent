@@ -125,6 +125,7 @@ class GeometryCompilerTests(unittest.TestCase):
         self.assertEqual(result.spec.params["radius_mm"], 22.0)
         self.assertEqual(result.spec.confidence, 0.84)
         self.assertEqual(result.spec.finalization_status, "ready")
+        self.assertGreaterEqual(result.spec.provenance_summary.get("user_explicit", 0), 1)
 
     def test_compile_single_cons_from_config(self) -> None:
         config = {
@@ -217,6 +218,12 @@ class GeometryCompilerTests(unittest.TestCase):
         self.assertTrue(comparison["compile_ok"])
         self.assertTrue(comparison["matches"])
         self.assertEqual(comparison["spec_structure"], "single_box")
+
+    def test_compile_geometry_rejects_non_positive_triplet(self) -> None:
+        frame = SlotFrame(confidence=0.9, geometry=GeometrySlots(kind="box", size_triplet_mm=[5, 0, 7]))
+        result = compile_geometry_spec_from_slot_frame(frame)
+        self.assertFalse(result.ok)
+        self.assertIn("non_positive_triplet:size_triplet_mm", result.errors)
 
 
 if __name__ == "__main__":

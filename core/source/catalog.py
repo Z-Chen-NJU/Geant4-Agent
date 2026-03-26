@@ -145,6 +145,7 @@ _SOURCE_CATALOG: tuple[SourceCatalogEntry, ...] = (
             _COMMON_FIELDS["direction_vec"],
         ),
         required_fields=("particle", "energy_mev", "position_mm"),
+        supported_in_runtime=False,
         description="Isotropic source centered at a position.",
     ),
     SourceCatalogEntry(
@@ -157,6 +158,7 @@ _SOURCE_CATALOG: tuple[SourceCatalogEntry, ...] = (
             _COMMON_FIELDS["direction_vec"],
         ),
         required_fields=("particle", "energy_mev", "position_mm"),
+        supported_in_runtime=False,
         description="Plane source placeholder for future runtime expansion.",
     ),
 )

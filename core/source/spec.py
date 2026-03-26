@@ -42,3 +42,7 @@ class SourceSpec:
     provenance_summary: dict[str, int] = field(default_factory=dict)
     validation_errors: tuple[str, ...] = field(default_factory=tuple)
     validation_warnings: tuple[str, ...] = field(default_factory=tuple)
+
+    @property
+    def runtime_ready(self) -> bool:
+        return self.finalization_status == "ready"

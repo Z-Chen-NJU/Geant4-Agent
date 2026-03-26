@@ -4,6 +4,8 @@ from core.source.spec import SourceSpec
 
 
 def source_spec_to_runtime_payload(spec: SourceSpec) -> dict[str, object]:
+    if not spec.runtime_ready:
+        raise ValueError(f"source_spec_not_runtime_ready:{spec.source_type}:{spec.finalization_status}")
     payload: dict[str, object] = {"source_type": spec.source_type}
     particle = spec.fields.get("particle")
     if particle is not None:

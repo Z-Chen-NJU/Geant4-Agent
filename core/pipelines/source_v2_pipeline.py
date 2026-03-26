@@ -14,6 +14,8 @@ def build_v2_source_updates(frame: SlotFrame, *, turn_id: int) -> tuple[list[Upd
             "finalization_status": result.spec.finalization_status if result.spec else "missing",
             "missing_fields": list(result.missing_fields),
             "errors": list(result.errors),
+            "warnings": list(result.warnings),
+            "runtime_ready": False,
         }
     fragment = source_spec_to_config_fragment(result.spec).get("source", {})
     updates: list[UpdateOp] = []
@@ -28,4 +30,5 @@ def build_v2_source_updates(frame: SlotFrame, *, turn_id: int) -> tuple[list[Upd
         "compile_ok": True,
         "source_type": result.spec.source_type,
         "finalization_status": result.spec.finalization_status,
+        "runtime_ready": result.spec.runtime_ready,
     }

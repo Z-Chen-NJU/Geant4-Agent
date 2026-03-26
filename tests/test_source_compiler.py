@@ -87,6 +87,7 @@ class SourceCompilerTests(unittest.TestCase):
         assert result.spec is not None
         self.assertEqual(result.spec.finalization_status, "review")
         self.assertIn("direction_ignored_for_isotropic", result.spec.validation_warnings)
+        self.assertFalse(result.spec.runtime_ready)
 
     def test_compile_point_from_config(self) -> None:
         config = {
@@ -121,6 +122,23 @@ class SourceCompilerTests(unittest.TestCase):
         self.assertEqual(payload["particle"], "proton")
         self.assertEqual(payload["energy"], 250.0)
         self.assertEqual(payload["position"]["z"], -120.0)
+
+    def test_source_spec_to_runtime_payload_rejects_review_spec(self) -> None:
+        frame = SlotFrame(
+            confidence=0.9,
+            source=SourceSlots(
+                kind="isotropic",
+                particle="gamma",
+                energy_mev=0.8,
+                position_mm=[0.0, 0.0, 0.0],
+            ),
+        )
+        result = compile_source_spec_from_slot_frame(frame)
+        self.assertTrue(result.ok)
+        assert result.spec is not None
+        self.assertFalse(result.spec.runtime_ready)
+        with self.assertRaisesRegex(ValueError, "source_spec_not_runtime_ready:isotropic:review"):
+            source_spec_to_runtime_payload(result.spec)
 
     def test_source_spec_to_config_fragment(self) -> None:
         frame = SlotFrame(

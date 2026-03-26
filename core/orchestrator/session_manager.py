@@ -17,7 +17,13 @@ from core.dialogue.renderer import render_dialogue_message
 from core.dialogue.state import build_raw_dialogue, collect_available_explanations, sync_dialogue_state
 from core.dialogue.types import build_dialogue_trace
 from core.geometry.adapters.legacy_compare import compare_slot_frame_geometry
-from core.pipelines import build_v2_geometry_updates, build_v2_source_updates, build_v2_spatial_updates
+from core.pipelines import (
+    build_v2_geometry_updates,
+    build_v2_geometry_updates_from_candidate,
+    build_v2_source_updates,
+    build_v2_source_updates_from_candidate,
+    build_v2_spatial_updates,
+)
 from core.pipelines.selectors import select_pipelines
 from core.source.adapters.legacy_compare import compare_slot_frame_source
 from core.orchestrator.arbiter import arbitrate_candidates
@@ -176,6 +182,77 @@ def _apply_updates(config: dict, updates: list) -> None:
         set_path(config, upd.path, upd.value)
 
 
+def _candidate_from_updates(
+    *,
+    intent: Intent,
+    updates: list[UpdateOp],
+    target_paths: list[str],
+    confidence: float,
+    rationale: str,
+) -> CandidateUpdate | None:
+    if not updates:
+        return None
+    return CandidateUpdate(
+        producer=updates[0].producer,
+        intent=intent,
+        target_paths=list(target_paths),
+        updates=list(updates),
+        confidence=float(confidence),
+        rationale=rationale,
+    )
+
+
+def _build_v2_bridge_candidates(
+    *,
+    base_config: dict[str, Any],
+    bridge_source: CandidateUpdate | None,
+    pipeline_selection: Any,
+    turn_id: int,
+    intent: Intent,
+    confidence: float,
+) -> tuple[list[CandidateUpdate], dict[str, Any]]:
+    if bridge_source is None or not bridge_source.updates:
+        return [], {}
+
+    bridge_candidates: list[CandidateUpdate] = []
+    bridge_meta: dict[str, Any] = {}
+    if pipeline_selection.geometry == "v2":
+        geometry_updates, geometry_targets, geometry_meta = build_v2_geometry_updates_from_candidate(
+            base_config,
+            bridge_source.updates,
+            turn_id=turn_id,
+            confidence=confidence,
+        )
+        bridge_meta["geometry_v2"] = geometry_meta
+        geometry_candidate = _candidate_from_updates(
+            intent=intent,
+            updates=geometry_updates,
+            target_paths=geometry_targets,
+            confidence=confidence,
+            rationale="v2_geometry_bridge_from_semantic_candidates",
+        )
+        if geometry_candidate is not None:
+            bridge_candidates.append(geometry_candidate)
+    if pipeline_selection.source == "v2":
+        source_updates, source_targets, source_meta = build_v2_source_updates_from_candidate(
+            base_config,
+            bridge_source.updates,
+            turn_id=turn_id,
+            confidence=confidence,
+        )
+        bridge_meta["source_v2"] = source_meta
+        source_candidate = _candidate_from_updates(
+            intent=intent,
+            updates=source_updates,
+            target_paths=source_targets,
+            confidence=confidence,
+            rationale="v2_source_bridge_from_semantic_candidates",
+        )
+        if source_candidate is not None:
+            bridge_candidates.append(source_candidate)
+    return bridge_candidates, bridge_meta
+
+
 def _dedupe_paths(paths: list[str]) -> list[str]:
     out: list[str] = []
     seen: set[str] = set()
@@ -318,6 +395,28 @@ def _merge_v2_missing_paths(
         spatial_meta = slot_debug.get("spatial_v2")
         if isinstance(spatial_meta, dict):
             merged = _dedupe_paths(merged + _spatial_review_missing_paths(spatial_meta))
+    return merged
+
+
+def _candidate_has_update_prefix(candidate: CandidateUpdate | None, prefix: str) -> bool:
+    if candidate is None:
+        return False
+    return any(str(update.path).startswith(prefix) for update in candidate.updates)
+
+
+def _merge_v2_meta(existing: Any, incoming: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(existing, dict):
+        return dict(incoming)
+    if existing.get("compile_ok"):
+        return dict(existing)
+    if incoming.get("compile_ok"):
+        return dict(incoming)
+    merged = dict(existing)
+    merged["missing_fields"] = _dedupe_paths(list(existing.get("missing_fields", []) or []) + list(incoming.get("missing_fields", []) or []))
+    merged["errors"] = _dedupe_paths(list(existing.get("errors", []) or []) + list(incoming.get("errors", []) or []))
+    merged["warnings"] = _dedupe_paths(list(existing.get("warnings", []) or []) + list(incoming.get("warnings", []) or []))
+    merged["runtime_ready"] = bool(existing.get("runtime_ready") or incoming.get("runtime_ready"))
+    merged["finalization_status"] = str(existing.get("finalization_status") or incoming.get("finalization_status") or "missing")
     return merged
 
 
@@ -856,6 +955,7 @@ def process_turn(
                 config_path=ollama_config_path,
                 apply_autofix=apply_autofix,
             )
+            bridge_source_candidate = extracted_candidate
             slot_structure = _candidate_structure(slot_candidate)
             extracted_structure = _candidate_structure(extracted_candidate)
             if pipeline_selection.geometry == "v2":
@@ -869,9 +969,32 @@ def process_turn(
                 slot_candidate = filter_candidate_by_explicit_targets(slot_candidate, list(user_candidate.target_paths))
             if user_candidate.target_paths:
                 extracted_candidate = filter_candidate_by_explicit_targets(extracted_candidate, list(user_candidate.target_paths))
+                bridge_source_candidate = filter_candidate_by_explicit_targets(bridge_source_candidate, list(user_candidate.target_paths))
             extracted_candidate = drop_updates_shadowed_by_anchor(extracted_candidate, slot_candidate)
+            bridge_candidates: list[CandidateUpdate] = []
+            bridge_meta: dict[str, Any] = {}
+            needs_geometry_bridge = pipeline_selection.geometry == "v2" and not _candidate_has_update_prefix(slot_candidate, "geometry.")
+            needs_source_bridge = pipeline_selection.source == "v2" and not _candidate_has_update_prefix(slot_candidate, "source.")
+            if needs_geometry_bridge or needs_source_bridge:
+                bridge_candidates, bridge_meta = _build_v2_bridge_candidates(
+                    base_config=draft.config,
+                    bridge_source=bridge_source_candidate,
+                    pipeline_selection=pipeline_selection,
+                    turn_id=state.turn_id,
+                    intent=user_candidate.intent,
+                    confidence=max(float(slot_result.confidence or 0.0), float(user_candidate.confidence or 0.0), 0.8),
+                )
+                if not needs_geometry_bridge:
+                    bridge_candidates = [candidate for candidate in bridge_candidates if not _candidate_has_update_prefix(candidate, "geometry.")]
+                    bridge_meta.pop("geometry_v2", None)
+                if not needs_source_bridge:
+                    bridge_candidates = [candidate for candidate in bridge_candidates if not _candidate_has_update_prefix(candidate, "source.")]
+                    bridge_meta.pop("source_v2", None)
+                for key, meta in bridge_meta.items():
+                    slot_debug[key] = _merge_v2_meta(slot_debug.get(key), meta)
             if slot_candidate is not None and slot_candidate.updates:
                 content_candidates.append(slot_candidate)
+            content_candidates.extend(bridge_candidates)
             if extracted_candidate.updates:
                 content_candidates.append(extracted_candidate)
             llm_used = True
@@ -917,15 +1040,44 @@ def process_turn(
                     semantic_result.candidate,
                     list(user_candidate.target_paths),
                 )
+                bridge_updates = list(semantic_candidate.updates)
+                bridge_source_candidate = CandidateUpdate(
+                    producer=Producer.BERT_EXTRACTOR,
+                    intent=user_candidate.intent,
+                    target_paths=list(user_candidate.target_paths),
+                    updates=bridge_updates,
+                    confidence=max(float(semantic_result.confidence or 0.0), float(user_candidate.confidence or 0.0), 0.8),
+                    rationale="v2_bridge_seed_from_semantic_frame",
+                )
                 if pipeline_selection.geometry == "v2":
                     semantic_candidate = _strip_geometry_updates(semantic_candidate)
                 if pipeline_selection.source == "v2":
                     semantic_candidate = _strip_source_updates(semantic_candidate)
                 if user_candidate.target_paths:
                     extracted_candidate = filter_candidate_by_explicit_targets(extracted_candidate, list(user_candidate.target_paths))
+                    bridge_source_candidate = filter_candidate_by_explicit_targets(bridge_source_candidate, list(user_candidate.target_paths))
+                bridge_source_candidate = CandidateUpdate(
+                    producer=bridge_source_candidate.producer,
+                    intent=bridge_source_candidate.intent,
+                    target_paths=list(bridge_source_candidate.target_paths),
+                    updates=list(bridge_source_candidate.updates) + list(extracted_candidate.updates),
+                    confidence=bridge_source_candidate.confidence,
+                    rationale=bridge_source_candidate.rationale,
+                )
                 extracted_candidate = drop_updates_shadowed_by_anchor(extracted_candidate, semantic_candidate)
+                bridge_candidates, bridge_meta = _build_v2_bridge_candidates(
+                    base_config=draft.config,
+                    bridge_source=bridge_source_candidate,
+                    pipeline_selection=pipeline_selection,
+                    turn_id=state.turn_id,
+                    intent=user_candidate.intent,
+                    confidence=max(float(semantic_result.confidence or 0.0), float(user_candidate.confidence or 0.0), 0.8),
+                )
+                for key, meta in bridge_meta.items():
+                    slot_debug[key] = _merge_v2_meta(slot_debug.get(key), meta)
                 if semantic_candidate.updates:
                     content_candidates.append(semantic_candidate)
+                content_candidates.extend(bridge_candidates)
                 if extracted_candidate.updates:
                     content_candidates.append(extracted_candidate)
                 llm_used = True
@@ -972,14 +1124,25 @@ def process_turn(
             config_path=ollama_config_path,
             apply_autofix=apply_autofix,
         )
+        bridge_source_candidate = primary_candidate
         if pipeline_selection.geometry == "v2":
             primary_candidate = _strip_geometry_updates(primary_candidate)
         if pipeline_selection.source == "v2":
             primary_candidate = _strip_source_updates(primary_candidate)
         normalized_text = norm["normalized_text"]
-        content_candidates = [
-            filter_candidate_by_explicit_targets(primary_candidate, list(user_candidate.target_paths))
-        ]
+        primary_candidate = filter_candidate_by_explicit_targets(primary_candidate, list(user_candidate.target_paths))
+        bridge_source_candidate = filter_candidate_by_explicit_targets(bridge_source_candidate, list(user_candidate.target_paths))
+        bridge_candidates, bridge_meta = _build_v2_bridge_candidates(
+            base_config=draft.config,
+            bridge_source=bridge_source_candidate,
+            pipeline_selection=pipeline_selection,
+            turn_id=state.turn_id,
+            intent=user_candidate.intent,
+            confidence=max(float(norm["confidence"] or 0.0), float(user_candidate.confidence or 0.0), 0.8),
+        )
+        for key, meta in bridge_meta.items():
+            slot_debug[key] = _merge_v2_meta(slot_debug.get(key), meta)
+        content_candidates = [*bridge_candidates, primary_candidate]
         normalization_payload = {
             "intent": norm["intent"].value,
             "confidence": norm["confidence"],

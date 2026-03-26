@@ -11,6 +11,22 @@ from core.geometry.spec import GeometryEvidence, GeometryFieldResolution, Geomet
 from core.geometry.validator import validate_geometry_intent
 
 
+def _infer_structure_from_config_params(geometry: dict[str, Any], params_blob: dict[str, Any]) -> str | None:
+    direct = str(geometry.get("structure") or "").strip()
+    resolved = resolve_geometry_structure(direct)
+    if resolved:
+        return resolved
+    if all(params_blob.get(key) is not None for key in ("module_x", "module_y", "module_z")):
+        return "single_box"
+    if all(params_blob.get(key) is not None for key in ("child_rmax", "child_hz")):
+        return "single_tubs"
+    if all(params_blob.get(key) is not None for key in ("rmax1", "rmax2", "child_hz")):
+        return "single_cons"
+    if all(params_blob.get(key) is not None for key in ("x1", "x2", "y1", "y2", "module_z")):
+        return "single_trd"
+    return None
+
+
 @dataclass(frozen=True)
 class GeometryCompileResult:
     intent: GeometryIntent
@@ -174,9 +190,9 @@ def build_geometry_intent_from_semantic_frame(frame: SemanticFrame) -> GeometryI
 
 def build_geometry_intent_from_config(config: dict[str, Any]) -> GeometryIntent:
     geometry = config.get("geometry", {}) if isinstance(config.get("geometry"), dict) else {}
-    structure = resolve_geometry_structure(geometry.get("structure"))
-    entry = get_geometry_catalog_entry(structure)
     params_blob = geometry.get("params", {}) if isinstance(geometry.get("params"), dict) else {}
+    structure = _infer_structure_from_config_params(geometry, params_blob)
+    entry = get_geometry_catalog_entry(structure)
     params: dict[str, Any] = {}
     evidence: list[GeometryEvidence] = []
     field_resolutions: dict[str, GeometryFieldResolution] = {}

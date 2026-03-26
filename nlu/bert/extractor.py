@@ -242,6 +242,15 @@ def _parse_position_shorthand(text: str) -> dict | None:
     return None
 
 
+def _parse_at_position(text: str) -> dict | None:
+    num = r"[-+]?\d*\.?\d+"
+    pat = rf"\bat\s*\(\s*({num})\s*[,锛?]\s*({num})\s*[,锛?]\s*({num})\s*\)\s*(?:mm|cm|m)?"
+    m = re.search(pat, text.lower())
+    if not m:
+        return None
+    return {"type": "vector", "value": [float(m.group(1)), float(m.group(2)), float(m.group(3))]}
+
+
 def _parse_at_to(text: str) -> tuple[dict | None, dict | None]:
     num = r"[-+]?\d*\.?\d+"
     pat = (
@@ -563,7 +572,7 @@ def extract_candidates_from_normalized_text(
                 turn_id=turn_id,
             )
         )
-    pos = _parse_vector(merged_text, "position") or _parse_position_shorthand(merged_text)
+    pos = _parse_vector(merged_text, "position") or _parse_at_position(merged_text) or _parse_position_shorthand(merged_text)
     at_pos, at_dir = _parse_at_to(merged_text)
     if pos is None and at_pos is not None:
         pos = at_pos

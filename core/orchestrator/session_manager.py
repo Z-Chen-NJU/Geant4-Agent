@@ -17,6 +17,7 @@ from core.dialogue.renderer import render_dialogue_message
 from core.dialogue.state import build_raw_dialogue, collect_available_explanations, sync_dialogue_state
 from core.dialogue.types import build_dialogue_trace
 from core.geometry.adapters.legacy_compare import compare_slot_frame_geometry
+from core.source.adapters.legacy_compare import compare_slot_frame_source
 from core.orchestrator.arbiter import arbitrate_candidates
 from core.orchestrator.candidate_preprocess import (
     drop_updates_shadowed_by_anchor,
@@ -652,6 +653,7 @@ def process_turn(
     llm_stage_failures: list[str] = []
     slot_debug: dict[str, Any] = {}
     geometry_compare: dict[str, Any] | None = None
+    source_compare: dict[str, Any] | None = None
     debug: dict[str, Any] = {"graph_candidates": []}
     semantic_missing_paths = list(state.semantic_missing_paths)
     normalized_text = text
@@ -678,6 +680,7 @@ def process_turn(
             slot_debug = dict(slot_result.stage_trace or {})
             slot_debug.setdefault("final_status", "ok")
             geometry_compare = compare_slot_frame_geometry(slot_result.frame, turn_id=state.turn_id)
+            source_compare = compare_slot_frame_source(slot_result.frame, turn_id=state.turn_id)
             _progress(progress_cb, "semantic_extract", "Extracting semantic candidates", "Runtime semantic extraction from normalized text.")
             extracted_candidate, debug = extract_candidates_from_normalized_text(
                 normalized_text,
@@ -1081,6 +1084,7 @@ def process_turn(
             "normalization": normalization_payload,
             "slot_debug": slot_debug,
             "geometry_compare": geometry_compare,
+            "source_compare": source_compare,
             "llm_stage_failures": list(llm_stage_failures),
             "llm_schema_errors": list(llm_schema_errors),
             "llm_raw_preview": str(llm_raw or "")[:2000],
@@ -1138,6 +1142,7 @@ def process_turn(
         "llm_stage_failures": llm_stage_failures,
         "slot_debug": slot_debug,
         "geometry_compare": geometry_compare,
+        "source_compare": source_compare,
         "temperatures": {
             "internal": internal_temperature,
             "user": user_temperature if llm_question else None,

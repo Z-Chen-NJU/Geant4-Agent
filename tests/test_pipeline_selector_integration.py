@@ -56,6 +56,7 @@ class PipelineSelectorIntegrationTests(unittest.TestCase):
                     "normalize_input": True,
                     "geometry_pipeline": "v2",
                     "source_pipeline": "v2",
+                    "enable_compare": False,
                 },
                 ollama_config_path="",
             )
@@ -64,6 +65,8 @@ class PipelineSelectorIntegrationTests(unittest.TestCase):
         self.assertEqual(out["config"]["geometry"]["structure"], "single_box")
         self.assertEqual(out["config"]["source"]["type"], "point")
         self.assertEqual(out["config"]["source"]["particle"], "gamma")
+        self.assertIsNone(out["geometry_compare"])
+        self.assertIsNone(out["source_compare"])
 
     def test_process_turn_keeps_legacy_default_when_not_selected(self) -> None:
         frame = SlotFrame(

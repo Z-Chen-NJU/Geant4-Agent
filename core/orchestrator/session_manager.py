@@ -650,6 +650,7 @@ def process_turn(
     user_temperature = float(payload.get("user_temperature", 1.0))
     normalize_input = bool(payload.get("normalize_input", True))
     apply_autofix = bool(payload.get("autofix", False))
+    enable_compare = bool(payload.get("enable_compare", True))
     enable_llm_first = bool(llm_router and normalize_input)
     llm_used = False
     fallback_reason = E_LLM_ROUTER_DISABLED if (not llm_router and normalize_input) else "E_LLM_DISABLED"
@@ -689,8 +690,9 @@ def process_turn(
             normalized_text = slot_result.normalized_text or text
             slot_debug = dict(slot_result.stage_trace or {})
             slot_debug.setdefault("final_status", "ok")
-            geometry_compare = compare_slot_frame_geometry(slot_result.frame, turn_id=state.turn_id)
-            source_compare = compare_slot_frame_source(slot_result.frame, turn_id=state.turn_id)
+            if enable_compare:
+                geometry_compare = compare_slot_frame_geometry(slot_result.frame, turn_id=state.turn_id)
+                source_compare = compare_slot_frame_source(slot_result.frame, turn_id=state.turn_id)
             _progress(progress_cb, "semantic_extract", "Extracting semantic candidates", "Runtime semantic extraction from normalized text.")
             extracted_candidate, debug = extract_candidates_from_normalized_text(
                 normalized_text,

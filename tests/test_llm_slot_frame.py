@@ -159,6 +159,51 @@ class LlmSlotFrameTest(unittest.TestCase):
         self.assertEqual(meta.get("schema_errors"), [])
         self.assertEqual(frame.output.format, "hdf5")
 
+    def test_parse_slot_payload_applies_geometry_candidate_side_length(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 0.7,
+            "normalized_text": "10 mm copper box",
+            "target_slots": ["geometry.kind"],
+            "slots": {"geometry": {"kind": "box"}},
+            "candidates": {
+                "geometry": {
+                    "kind_candidate": "box",
+                    "side_length_mm": 10,
+                }
+            },
+        }
+        frame, meta = parse_slot_payload(payload)
+        self.assertIsNotNone(frame)
+        assert frame is not None
+        self.assertEqual(meta.get("schema_errors"), [])
+        self.assertEqual(frame.geometry.kind, "box")
+        self.assertEqual(frame.geometry.size_triplet_mm, [10.0, 10.0, 10.0])
+
+    def test_parse_slot_payload_applies_relative_source_candidate(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 0.7,
+            "normalized_text": "20 mm outside target center along -z",
+            "target_slots": ["source.kind", "source.position_mm", "source.direction_vec"],
+            "slots": {"source": {"kind": "point"}},
+            "candidates": {
+                "source": {
+                    "relation": "outside_target_center",
+                    "offset_mm": 20,
+                    "axis": "-z",
+                    "direction_mode": "toward_target_center",
+                }
+            },
+        }
+        frame, meta = parse_slot_payload(payload)
+        self.assertIsNotNone(frame)
+        assert frame is not None
+        self.assertEqual(meta.get("schema_errors"), [])
+        self.assertEqual(frame.source.kind, "point")
+        self.assertEqual(frame.source.position_mm, [0.0, 0.0, -20.0])
+        self.assertEqual(frame.source.direction_vec, [0.0, 0.0, 1.0])
+
     def test_cylinder_half_length_maps_to_child_hz(self) -> None:
         payload = {
             "intent": "SET",

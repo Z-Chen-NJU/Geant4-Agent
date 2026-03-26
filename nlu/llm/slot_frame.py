@@ -95,6 +95,14 @@ _PARTICLE_ALIASES = {
 }
 _MATERIAL_ALIASES = dict(BASE_MATERIAL_ALIASES)
 _NULL_LITERALS = {"null", "none", "n/a", "na", "unknown", "\u65e0", "\u672a\u77e5", "\u7a7a"}
+_AXIS_VECTORS = {
+    "+x": ([1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]),
+    "-x": ([-1.0, 0.0, 0.0], [1.0, 0.0, 0.0]),
+    "+y": ([0.0, 1.0, 0.0], [0.0, -1.0, 0.0]),
+    "-y": ([0.0, -1.0, 0.0], [0.0, 1.0, 0.0]),
+    "+z": ([0.0, 0.0, 1.0], [0.0, 0.0, -1.0]),
+    "-z": ([0.0, 0.0, -1.0], [0.0, 0.0, 1.0]),
+}
 
 
 @dataclass
@@ -1419,12 +1427,57 @@ def _coerce_slot_payload(payload: dict[str, Any]) -> tuple[SlotFrame, dict[str, 
     elif "output" in slots:
         errors.append("output_not_object")
 
+    candidates = payload.get("candidates", {})
+    if isinstance(candidates, dict):
+        _apply_controlled_candidates(frame, candidates, errors)
+    elif "candidates" in payload:
+        errors.append("candidates_not_object")
+
     meta = {
         "confidence": frame.confidence,
         "normalized_text": frame.normalized_text,
         "schema_errors": errors,
     }
     return frame, meta
+
+
+def _apply_controlled_candidates(frame: SlotFrame, candidates: dict[str, Any], errors: list[str]) -> None:
+    geometry = candidates.get("geometry", {})
+    if isinstance(geometry, dict):
+        kind_candidate = _canonical_geometry_kind(geometry.get("kind_candidate"))
+        side_length = _coerce_length_mm(geometry.get("side_length_mm"))
+        if frame.geometry.kind is None and kind_candidate is not None:
+            frame.geometry.kind = kind_candidate
+            frame.notes.append(f"candidate.geometry.kind:{kind_candidate}")
+        if (
+            frame.geometry.size_triplet_mm is None
+            and frame.geometry.kind == "box"
+            and side_length is not None
+        ):
+            frame.geometry.size_triplet_mm = [side_length, side_length, side_length]
+            frame.notes.append(f"candidate.geometry.side_length_mm:{side_length}")
+    elif "geometry" in candidates:
+        errors.append("candidate_geometry_not_object")
+
+    source = candidates.get("source", {})
+    if isinstance(source, dict):
+        relation = _clean_scalar(source.get("relation"))
+        offset_mm = _coerce_length_mm(source.get("offset_mm"))
+        axis = (_clean_scalar(source.get("axis")) or "").lower()
+        direction_mode = (_clean_scalar(source.get("direction_mode")) or "toward_target_center").lower()
+        if relation == "outside_target_center" and offset_mm is not None and axis in _AXIS_VECTORS:
+            axis_position, axis_toward_center = _AXIS_VECTORS[axis]
+            if frame.source.position_mm is None:
+                frame.source.position_mm = [component * offset_mm for component in axis_position]
+                frame.notes.append(f"candidate.source.relative_position:{offset_mm}:{axis}")
+            if frame.source.direction_vec is None:
+                if direction_mode == "along_axis":
+                    frame.source.direction_vec = list(axis_position)
+                else:
+                    frame.source.direction_vec = list(axis_toward_center)
+                frame.notes.append(f"candidate.source.direction_mode:{direction_mode}")
+    elif "source" in candidates:
+        errors.append("candidate_source_not_object")
 
 
 def parse_slot_payload(payload: dict[str, Any]) -> tuple[SlotFrame | None, dict[str, Any]]:

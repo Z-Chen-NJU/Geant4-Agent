@@ -67,6 +67,10 @@ def _build_strict_slot_prompt_v2(user_text: str, context_summary: str) -> str:
         '    "source": {"kind": "point|beam|plane|isotropic|null", "particle": "gamma|e-|proton|neutron|null", "energy_mev": 1.0, "position_mm": [0,0,-100], "direction_vec": [0,0,1]},\n'
         '    "physics": {"explicit_list": "FTFP_BERT|null", "recommendation_intent": "gamma_attenuation|null"},\n'
         '    "output": {"format": "csv|hdf5|root|xml|json|null", "path": null}\n'
+        '  },\n'
+        '  "candidates": {\n'
+        '    "geometry": {"kind_candidate": "box|cylinder|sphere|orb|cons|trd|polycone|polyhedra|cuttubs|trap|para|torus|ellipsoid|elltube|null", "side_length_mm": null},\n'
+        '    "source": {"relation": "outside_target_center|null", "offset_mm": null, "axis": "+x|-x|+y|-y|+z|-z|null", "direction_mode": "toward_target_center|along_axis|null"}\n'
         "  }\n"
         "}\n"
         "Hard rules:\n"
@@ -99,12 +103,18 @@ def _build_strict_slot_prompt_v2(user_text: str, context_summary: str) -> str:
         "- Prefer official Geant4 analysis file types (csv, hdf5, root, xml); use json only for the project-local export mode.\n"
         "- Internally canonicalize any input language into English clauses.\n"
         "- Keep normalized_text concise and in English canonical clauses.\n"
+        "- Use candidates only for tightly bounded shorthand or relative phrases; never invent final values beyond the candidate schema.\n"
+        "- If shorthand is ambiguous, leave slots null and either omit candidates or set only the uncertain kind_candidate.\n"
         "Examples:\n"
         '- User: "copper cylinder, radius 30 mm, half-length 50 mm"\n'
         '  JSON slots.geometry = {"kind":"cylinder","radius_mm":30,"half_length_mm":50}\n'
         '- User: "\\u4e00\\u7c73\\u89c1\\u65b9\\u7684\\u94dc\\u7acb\\u65b9\\u4f53"\n'
         '  JSON slots.geometry = {"kind":"box","size_triplet_mm":[1000,1000,1000]}\n'
         '  JSON slots.materials = {"primary":"G4_Cu"}\n'
+        '- User: "10 mm copper box"\n'
+        '  JSON slots.geometry may stay partial, but JSON candidates.geometry = {"kind_candidate":"box","side_length_mm":10}\n'
+        '- User: "20 mm outside the target center along -z"\n'
+        '  JSON candidates.source = {"relation":"outside_target_center","offset_mm":20,"axis":"-z","direction_mode":"toward_target_center"}\n'
         '- User: "Output json."\n'
         '  JSON intent = "SET"; JSON slots.output = {"format":"json"}; all other slot groups stay null\n'
         '- User: "change material to G4_Al"\n'

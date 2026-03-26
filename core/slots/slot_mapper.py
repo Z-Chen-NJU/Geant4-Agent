@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from core.geometry.family_catalog import GEOMETRY_KIND_TO_STRUCTURE, GEOMETRY_SLOT_TARGET_TO_PATHS
+from core.geometry.adapters.config_fragment import geometry_spec_to_config_fragment
+from core.geometry.compiler import compile_geometry_spec_from_slot_frame
 from core.orchestrator.types import CandidateUpdate, Intent, Producer, UpdateOp
 from core.slots.slot_frame import SlotFrame
 
@@ -36,11 +38,56 @@ def _vector3(value: list[float]) -> dict[str, object]:
     return {"type": "vector", "value": [float(value[0]), float(value[1]), float(value[2])]}
 
 
-def slot_frame_to_candidates(frame: SlotFrame, *, turn_id: int) -> tuple[CandidateUpdate | None, CandidateUpdate]:
+def _geometry_updates_from_fragment(frame: SlotFrame, *, turn_id: int) -> tuple[list[UpdateOp], list[str]]:
+    result = compile_geometry_spec_from_slot_frame(frame)
+    if not result.ok or result.spec is None or result.spec.finalization_status != "ready":
+        return [], []
+    if result.spec.structure not in {"single_box", "single_tubs"}:
+        return [], []
+
+    fragment = geometry_spec_to_config_fragment(result.spec).get("geometry", {})
     updates: list[UpdateOp] = []
     target_paths: list[str] = []
 
-    if frame.geometry.kind:
+    structure = fragment.get("structure")
+    if structure:
+        updates.append(
+            UpdateOp(
+                path="geometry.structure",
+                op="set",
+                value=structure,
+                producer=Producer.SLOT_MAPPER,
+                confidence=frame.confidence or 0.8,
+                turn_id=turn_id,
+            )
+        )
+        target_paths.extend(["geometry.structure", "geometry.root_name"])
+
+    params = fragment.get("params", {}) if isinstance(fragment.get("params"), dict) else {}
+    for key, value in params.items():
+        updates.append(
+            UpdateOp(
+                path=f"geometry.params.{key}",
+                op="set",
+                value=value,
+                producer=Producer.SLOT_MAPPER,
+                confidence=frame.confidence or 0.8,
+                turn_id=turn_id,
+            )
+        )
+        target_paths.append(f"geometry.params.{key}")
+    return updates, target_paths
+
+
+def slot_frame_to_candidates(frame: SlotFrame, *, turn_id: int) -> tuple[CandidateUpdate | None, CandidateUpdate]:
+    updates: list[UpdateOp] = []
+    target_paths: list[str] = []
+    geometry_updates, geometry_targets = _geometry_updates_from_fragment(frame, turn_id=turn_id)
+    if geometry_updates:
+        updates.extend(geometry_updates)
+        target_paths.extend(geometry_targets)
+
+    if frame.geometry.kind and not geometry_updates:
         structure = GEOMETRY_KIND_TO_STRUCTURE.get(frame.geometry.kind)
         if structure:
             updates.append(
@@ -55,7 +102,7 @@ def slot_frame_to_candidates(frame: SlotFrame, *, turn_id: int) -> tuple[Candida
             )
             target_paths.extend(["geometry.structure", "geometry.root_name"])
 
-    if frame.geometry.size_triplet_mm:
+    if frame.geometry.size_triplet_mm and not geometry_updates:
         labels = ("module_x", "module_y", "module_z")
         for label, value in zip(labels, frame.geometry.size_triplet_mm):
             updates.append(
@@ -70,7 +117,7 @@ def slot_frame_to_candidates(frame: SlotFrame, *, turn_id: int) -> tuple[Candida
             )
             target_paths.append(f"geometry.params.{label}")
 
-    if frame.geometry.radius_mm is not None:
+    if frame.geometry.radius_mm is not None and not geometry_updates:
         updates.append(
             UpdateOp(
                 path="geometry.params.child_rmax",
@@ -83,7 +130,7 @@ def slot_frame_to_candidates(frame: SlotFrame, *, turn_id: int) -> tuple[Candida
         )
         target_paths.append("geometry.params.child_rmax")
 
-    if frame.geometry.half_length_mm is not None:
+    if frame.geometry.half_length_mm is not None and not geometry_updates:
         updates.append(
             UpdateOp(
                 path="geometry.params.child_hz",

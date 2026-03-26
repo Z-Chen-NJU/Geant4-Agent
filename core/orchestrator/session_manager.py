@@ -16,7 +16,7 @@ from core.dialogue.policy import decide_dialogue_action
 from core.dialogue.renderer import render_dialogue_message
 from core.dialogue.state import build_raw_dialogue, collect_available_explanations, sync_dialogue_state
 from core.dialogue.types import build_dialogue_trace
-from core.geometry import compare_slot_frame_geometry
+from core.geometry.adapters.legacy_compare import compare_slot_frame_geometry
 from core.orchestrator.arbiter import arbitrate_candidates
 from core.orchestrator.candidate_preprocess import (
     drop_updates_shadowed_by_anchor,

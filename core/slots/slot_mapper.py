@@ -5,6 +5,7 @@ from core.orchestrator.types import CandidateUpdate, Intent, Producer, UpdateOp
 from core.pipelines import (
     PIPELINE_LEGACY,
     PIPELINE_V2,
+    build_v2_spatial_updates,
     build_legacy_geometry_updates,
     build_legacy_source_updates,
     build_v2_geometry_updates,
@@ -67,15 +68,24 @@ def slot_frame_to_candidates(
     updates: list[UpdateOp] = []
     target_paths: list[str] = []
 
-    geometry_updates, geometry_targets = _build_geometry_updates(frame, turn_id=turn_id, geometry_mode=selection.geometry)
-    if geometry_updates:
-        updates.extend(geometry_updates)
-        target_paths.extend(geometry_targets)
+    if selection.geometry == PIPELINE_V2 and selection.source == PIPELINE_V2:
+        spatial_result = build_v2_spatial_updates(frame, turn_id=turn_id)
+        if spatial_result.geometry_updates:
+            updates.extend(spatial_result.geometry_updates)
+            target_paths.extend(spatial_result.geometry_targets)
+        if spatial_result.source_updates:
+            updates.extend(spatial_result.source_updates)
+            target_paths.extend(spatial_result.source_targets)
+    else:
+        geometry_updates, geometry_targets = _build_geometry_updates(frame, turn_id=turn_id, geometry_mode=selection.geometry)
+        if geometry_updates:
+            updates.extend(geometry_updates)
+            target_paths.extend(geometry_targets)
 
-    source_updates, source_targets = _build_source_updates(frame, turn_id=turn_id, source_mode=selection.source)
-    if source_updates:
-        updates.extend(source_updates)
-        target_paths.extend(source_targets)
+        source_updates, source_targets = _build_source_updates(frame, turn_id=turn_id, source_mode=selection.source)
+        if source_updates:
+            updates.extend(source_updates)
+            target_paths.extend(source_targets)
 
     if frame.materials.primary:
         updates.append(

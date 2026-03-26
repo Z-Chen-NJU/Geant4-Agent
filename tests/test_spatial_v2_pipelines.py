@@ -5,6 +5,7 @@ import unittest
 from core.contracts.slots import GeometrySlots, SlotFrame, SourceSlots
 from core.pipelines.geometry_v2_pipeline import build_v2_geometry_updates
 from core.pipelines.selectors import PIPELINE_LEGACY, PIPELINE_V2, select_pipelines
+from core.pipelines.spatial_v2_pipeline import build_v2_spatial_updates
 from core.pipelines.source_v2_pipeline import build_v2_source_updates
 from core.slots.slot_mapper import slot_frame_to_candidates
 
@@ -86,6 +87,40 @@ class SpatialV2PipelineTests(unittest.TestCase):
         selection = select_pipelines()
         self.assertEqual(selection.geometry, PIPELINE_LEGACY)
         self.assertEqual(selection.source, PIPELINE_LEGACY)
+
+    def test_spatial_v2_pipeline_reports_source_relation_for_box(self) -> None:
+        frame = SlotFrame(
+            confidence=0.9,
+            geometry=GeometrySlots(kind="box", size_triplet_mm=[10.0, 20.0, 30.0]),
+            source=SourceSlots(
+                kind="point",
+                particle="gamma",
+                energy_mev=1.0,
+                position_mm=[0.0, 0.0, -20.0],
+                direction_vec=[0.0, 0.0, 1.0],
+            ),
+        )
+        result = build_v2_spatial_updates(frame, turn_id=5)
+        self.assertEqual(result.geometry_meta["finalization_status"], "ready")
+        self.assertEqual(result.source_meta["finalization_status"], "ready")
+        self.assertEqual(result.spatial_meta["source_relation"], "outside_target")
+        self.assertGreater(result.spatial_meta["surface_distance_mm"], 0.0)
+
+    def test_spatial_v2_pipeline_warns_when_source_inside_target(self) -> None:
+        frame = SlotFrame(
+            confidence=0.9,
+            geometry=GeometrySlots(kind="box", size_triplet_mm=[10.0, 20.0, 30.0]),
+            source=SourceSlots(
+                kind="point",
+                particle="gamma",
+                energy_mev=1.0,
+                position_mm=[0.0, 0.0, 0.0],
+                direction_vec=[0.0, 0.0, 1.0],
+            ),
+        )
+        result = build_v2_spatial_updates(frame, turn_id=6)
+        self.assertIn("source_inside_target", result.warnings)
+        self.assertEqual(result.spatial_meta["source_relation"], "inside_target")
 
 
 if __name__ == "__main__":

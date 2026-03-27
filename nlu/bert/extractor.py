@@ -338,6 +338,27 @@ def _parse_relative_target_source(text: str) -> tuple[dict | None, dict | None]:
     return None, None
 
 
+def _parse_direction_relation_from_position(text: str, position: dict | None) -> dict | None:
+    if not isinstance(position, dict):
+        return None
+    value = position.get("value")
+    if not isinstance(value, list) or len(value) < 3:
+        return None
+    if "toward target center" in text.lower() or "towards target center" in text.lower():
+        magnitude = sum(float(component) * float(component) for component in value) ** 0.5
+        if magnitude <= 1e-9:
+            return None
+        return {
+            "type": "vector",
+            "value": [
+                -float(value[0]) / magnitude,
+                -float(value[1]) / magnitude,
+                -float(value[2]) / magnitude,
+            ],
+        }
+    return None
+
+
 def extract_candidates_from_normalized_text(
     normalized_text: str,
     *,
@@ -692,6 +713,8 @@ def extract_candidates_from_normalized_text(
         direction = relative_dir
     if direction is None and relative_target_dir is not None:
         direction = relative_target_dir
+    if direction is None:
+        direction = _parse_direction_relation_from_position(merged_text, pos)
     if direction is not None:
         updates.append(
             UpdateOp(

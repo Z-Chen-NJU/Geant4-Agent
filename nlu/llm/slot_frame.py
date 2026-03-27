@@ -105,6 +105,13 @@ _AXIS_VECTORS = {
 }
 
 
+def _normalize_vec3(values: list[float]) -> list[float] | None:
+    norm = sum(component * component for component in values) ** 0.5
+    if norm <= 1e-9:
+        return None
+    return [component / norm for component in values]
+
+
 @dataclass
 class LlmSlotBuildResult:
     ok: bool
@@ -1447,6 +1454,7 @@ def _apply_controlled_candidates(frame: SlotFrame, candidates: dict[str, Any], e
         kind_candidate = _canonical_geometry_kind(geometry.get("kind_candidate"))
         side_length = _coerce_length_mm(geometry.get("side_length_mm"))
         radius_mm = _coerce_length_mm(geometry.get("radius_mm"))
+        diameter_mm = _coerce_length_mm(geometry.get("diameter_mm"))
         half_length_mm = _coerce_length_mm(geometry.get("half_length_mm"))
         full_length_mm = _coerce_length_mm(geometry.get("full_length_mm"))
         if frame.geometry.kind is None and kind_candidate is not None:
@@ -1460,9 +1468,13 @@ def _apply_controlled_candidates(frame: SlotFrame, candidates: dict[str, Any], e
             frame.geometry.size_triplet_mm = [side_length, side_length, side_length]
             frame.notes.append(f"candidate.geometry.side_length_mm:{side_length}")
         if frame.geometry.kind == "cylinder":
-            if frame.geometry.radius_mm is None and radius_mm is not None:
-                frame.geometry.radius_mm = radius_mm
-                frame.notes.append(f"candidate.geometry.radius_mm:{radius_mm}")
+            resolved_radius = radius_mm
+            if resolved_radius is None and diameter_mm is not None:
+                resolved_radius = diameter_mm / 2.0
+                frame.notes.append(f"candidate.geometry.diameter_mm:{diameter_mm}")
+            if frame.geometry.radius_mm is None and resolved_radius is not None:
+                frame.geometry.radius_mm = resolved_radius
+                frame.notes.append(f"candidate.geometry.radius_mm:{resolved_radius}")
             resolved_half_length = half_length_mm
             if resolved_half_length is None and full_length_mm is not None:
                 resolved_half_length = full_length_mm / 2.0
@@ -1474,9 +1486,14 @@ def _apply_controlled_candidates(frame: SlotFrame, candidates: dict[str, Any], e
                 frame.notes.append(
                     f"candidate.geometry.half_length_mm:{resolved_half_length}"
                 )
-        if frame.geometry.kind in {"sphere", "orb"} and frame.geometry.radius_mm is None and radius_mm is not None:
-            frame.geometry.radius_mm = radius_mm
-            frame.notes.append(f"candidate.geometry.radius_mm:{radius_mm}")
+        if frame.geometry.kind in {"sphere", "orb"} and frame.geometry.radius_mm is None:
+            resolved_radius = radius_mm
+            if resolved_radius is None and diameter_mm is not None:
+                resolved_radius = diameter_mm / 2.0
+                frame.notes.append(f"candidate.geometry.diameter_mm:{diameter_mm}")
+            if resolved_radius is not None:
+                frame.geometry.radius_mm = resolved_radius
+                frame.notes.append(f"candidate.geometry.radius_mm:{resolved_radius}")
     elif "geometry" in candidates:
         errors.append("candidate_geometry_not_object")
 
@@ -1486,6 +1503,7 @@ def _apply_controlled_candidates(frame: SlotFrame, candidates: dict[str, Any], e
         offset_mm = _coerce_length_mm(source.get("offset_mm"))
         axis = (_clean_scalar(source.get("axis")) or "").lower()
         direction_mode = (_clean_scalar(source.get("direction_mode")) or "toward_target_center").lower()
+        direction_relation = (_clean_scalar(source.get("direction_relation")) or "").lower()
         if relation in {"outside_target_center", "in_front_of_target", "upstream_of_target"} and offset_mm is not None and axis in _AXIS_VECTORS:
             axis_position, axis_toward_center = _AXIS_VECTORS[axis]
             if frame.source.position_mm is None:
@@ -1499,6 +1517,16 @@ def _apply_controlled_candidates(frame: SlotFrame, candidates: dict[str, Any], e
                 else:
                     frame.source.direction_vec = list(axis_toward_center)
                 frame.notes.append(f"candidate.source.direction_mode:{direction_mode}")
+        if frame.source.direction_vec is None and direction_relation:
+            if direction_relation == "normal_to_target_face" and axis in _AXIS_VECTORS:
+                _, axis_toward_center = _AXIS_VECTORS[axis]
+                frame.source.direction_vec = list(axis_toward_center)
+                frame.notes.append(f"candidate.source.direction_relation:{direction_relation}")
+            elif direction_relation == "toward_target_center" and frame.source.position_mm is not None:
+                normalized = _normalize_vec3([-component for component in frame.source.position_mm])
+                if normalized is not None:
+                    frame.source.direction_vec = normalized
+                    frame.notes.append(f"candidate.source.direction_relation:{direction_relation}")
     elif "source" in candidates:
         errors.append("candidate_source_not_object")
 

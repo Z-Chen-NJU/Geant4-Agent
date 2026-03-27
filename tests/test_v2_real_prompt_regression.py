@@ -96,6 +96,15 @@ class V2RealPromptRegressionTests(unittest.TestCase):
         self.assertEqual(out["config"]["source"]["position"]["value"], [0.0, 0.0, -5.0])
         self.assertEqual(out["config"]["source"]["direction"]["value"], [0.0, 0.0, 1.0])
 
+    def test_toward_target_center_phrase_is_understood_by_v2(self) -> None:
+        out = self._run(
+            "10 mm x 10 mm x 10 mm copper box target; "
+            "gamma point source 1 MeV at (0,0,-20) mm toward target center; "
+            "physics FTFP_BERT; output json."
+        )
+        self.assertTrue(out["is_complete"])
+        self.assertEqual(out["config"]["source"]["direction"]["value"], [0.0, 0.0, 1.0])
+
 
 if __name__ == "__main__":
     unittest.main()

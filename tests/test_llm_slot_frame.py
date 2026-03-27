@@ -248,6 +248,26 @@ class LlmSlotFrameTest(unittest.TestCase):
         self.assertEqual(frame.geometry.kind, "orb")
         self.assertEqual(frame.geometry.radius_mm, 50.0)
 
+    def test_parse_slot_payload_applies_orb_candidate_diameter(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 0.7,
+            "normalized_text": "20 mm sphere",
+            "target_slots": ["geometry.kind"],
+            "slots": {"geometry": {"kind": "orb"}},
+            "candidates": {
+                "geometry": {
+                    "kind_candidate": "orb",
+                    "diameter_mm": 20,
+                }
+            },
+        }
+        frame, meta = parse_slot_payload(payload)
+        self.assertIsNotNone(frame)
+        assert frame is not None
+        self.assertEqual(meta.get("schema_errors"), [])
+        self.assertEqual(frame.geometry.radius_mm, 10.0)
+
     def test_parse_slot_payload_applies_source_in_front_candidate(self) -> None:
         payload = {
             "intent": "SET",
@@ -269,6 +289,50 @@ class LlmSlotFrameTest(unittest.TestCase):
         assert frame is not None
         self.assertEqual(meta.get("schema_errors"), [])
         self.assertEqual(frame.source.position_mm, [0.0, 0.0, -5.0])
+        self.assertEqual(frame.source.direction_vec, [0.0, 0.0, 1.0])
+
+    def test_parse_slot_payload_applies_direction_relation_toward_center(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 0.7,
+            "normalized_text": "point source at (0,0,-20) toward target center",
+            "target_slots": ["source.kind", "source.position_mm"],
+            "slots": {
+                "source": {
+                    "kind": "point",
+                    "position_mm": [0, 0, -20],
+                }
+            },
+            "candidates": {
+                "source": {
+                    "direction_relation": "toward_target_center",
+                }
+            },
+        }
+        frame, meta = parse_slot_payload(payload)
+        self.assertIsNotNone(frame)
+        assert frame is not None
+        self.assertEqual(meta.get("schema_errors"), [])
+        self.assertEqual(frame.source.direction_vec, [0.0, 0.0, 1.0])
+
+    def test_parse_slot_payload_applies_direction_relation_normal_to_face(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 0.7,
+            "normalized_text": "beam normal to target face along -z",
+            "target_slots": ["source.kind"],
+            "slots": {"source": {"kind": "beam"}},
+            "candidates": {
+                "source": {
+                    "axis": "-z",
+                    "direction_relation": "normal_to_target_face",
+                }
+            },
+        }
+        frame, meta = parse_slot_payload(payload)
+        self.assertIsNotNone(frame)
+        assert frame is not None
+        self.assertEqual(meta.get("schema_errors"), [])
         self.assertEqual(frame.source.direction_vec, [0.0, 0.0, 1.0])
 
     def test_cylinder_half_length_maps_to_child_hz(self) -> None:

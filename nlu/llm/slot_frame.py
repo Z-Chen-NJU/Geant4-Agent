@@ -1518,7 +1518,7 @@ def _apply_controlled_candidates(frame: SlotFrame, candidates: dict[str, Any], e
                     frame.source.direction_vec = list(axis_toward_center)
                 frame.notes.append(f"candidate.source.direction_mode:{direction_mode}")
         if frame.source.direction_vec is None and direction_relation:
-            if direction_relation == "normal_to_target_face" and axis in _AXIS_VECTORS:
+            if direction_relation in {"normal_to_target_face", "toward_target_face"} and axis in _AXIS_VECTORS:
                 _, axis_toward_center = _AXIS_VECTORS[axis]
                 frame.source.direction_vec = list(axis_toward_center)
                 frame.notes.append(f"candidate.source.direction_relation:{direction_relation}")

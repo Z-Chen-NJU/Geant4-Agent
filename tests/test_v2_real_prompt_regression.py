@@ -105,6 +105,36 @@ class V2RealPromptRegressionTests(unittest.TestCase):
         self.assertTrue(out["is_complete"])
         self.assertEqual(out["config"]["source"]["direction"]["value"], [0.0, 0.0, 1.0])
 
+    def test_cylinder_diameter_shorthand_is_understood_by_v2(self) -> None:
+        out = self._run(
+            "20 mm diameter copper cylinder with half length 40 mm; "
+            "gamma point source 1 MeV at (0,0,-20) mm along +z; "
+            "physics FTFP_BERT; output json."
+        )
+        self.assertTrue(out["is_complete"])
+        self.assertEqual(out["config"]["geometry"]["structure"], "single_tubs")
+        self.assertEqual(out["config"]["geometry"]["params"]["child_rmax"], 10.0)
+        self.assertEqual(out["config"]["geometry"]["params"]["child_hz"], 40.0)
+
+    def test_target_surface_phrase_is_understood_by_v2(self) -> None:
+        out = self._run(
+            "10 mm x 10 mm x 10 mm copper box target; "
+            "gamma point source 1 MeV 5 mm from the target surface along -z; "
+            "physics FTFP_BERT; output json."
+        )
+        self.assertTrue(out["is_complete"])
+        self.assertEqual(out["config"]["source"]["position"]["value"], [0.0, 0.0, -5.0])
+        self.assertEqual(out["config"]["source"]["direction"]["value"], [0.0, 0.0, 1.0])
+
+    def test_toward_target_face_phrase_is_understood_by_v2(self) -> None:
+        out = self._run(
+            "10 mm x 10 mm x 10 mm copper box target; "
+            "gamma point source 1 MeV at (0,0,-20) mm toward target face along -z; "
+            "physics FTFP_BERT; output json."
+        )
+        self.assertTrue(out["is_complete"])
+        self.assertEqual(out["config"]["source"]["direction"]["value"], [0.0, 0.0, 1.0])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -268,6 +268,26 @@ class LlmSlotFrameTest(unittest.TestCase):
         self.assertEqual(meta.get("schema_errors"), [])
         self.assertEqual(frame.geometry.radius_mm, 10.0)
 
+    def test_parse_slot_payload_applies_cylinder_candidate_diameter(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 0.7,
+            "normalized_text": "20 mm diameter copper cylinder",
+            "target_slots": ["geometry.kind"],
+            "slots": {"geometry": {"kind": "cylinder"}},
+            "candidates": {
+                "geometry": {
+                    "kind_candidate": "cylinder",
+                    "diameter_mm": 20,
+                }
+            },
+        }
+        frame, meta = parse_slot_payload(payload)
+        self.assertIsNotNone(frame)
+        assert frame is not None
+        self.assertEqual(meta.get("schema_errors"), [])
+        self.assertEqual(frame.geometry.radius_mm, 10.0)
+
     def test_parse_slot_payload_applies_source_in_front_candidate(self) -> None:
         payload = {
             "intent": "SET",
@@ -326,6 +346,26 @@ class LlmSlotFrameTest(unittest.TestCase):
                 "source": {
                     "axis": "-z",
                     "direction_relation": "normal_to_target_face",
+                }
+            },
+        }
+        frame, meta = parse_slot_payload(payload)
+        self.assertIsNotNone(frame)
+        assert frame is not None
+        self.assertEqual(meta.get("schema_errors"), [])
+        self.assertEqual(frame.source.direction_vec, [0.0, 0.0, 1.0])
+
+    def test_parse_slot_payload_applies_direction_relation_toward_face(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 0.7,
+            "normalized_text": "point source toward target face along -z",
+            "target_slots": ["source.kind"],
+            "slots": {"source": {"kind": "point"}},
+            "candidates": {
+                "source": {
+                    "axis": "-z",
+                    "direction_relation": "toward_target_face",
                 }
             },
         }

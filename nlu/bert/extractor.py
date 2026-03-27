@@ -81,6 +81,8 @@ def _parse_named_length_mm(text: str, keys: list[str]) -> float | None:
     key_pat = "|".join(re.escape(k) for k in keys)
     m = re.search(rf"(?:{key_pat})\s*[:=]?\s*({num})\s*{unit}", text.lower())
     if not m:
+        m = re.search(rf"({num})\s*{unit}\s*(?:{key_pat})", text.lower())
+    if not m:
         return None
     return _value_to_mm(float(m.group(1)), m.group(2))
 
@@ -315,6 +317,8 @@ def _parse_relative_target_source(text: str) -> tuple[dict | None, dict | None]:
     patterns = [
         r"([-+]?\d*\.?\d+)\s*(mm|cm|m)\s*(?:in front of|upstream of)\s*(?:the\s+)?target(?:\s+along\s*([+-][xyz]))?",
         r"(?:in front of|upstream of)\s*(?:the\s+)?target\s*by\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)(?:\s+along\s*([+-][xyz]))?",
+        r"([-+]?\d*\.?\d+)\s*(mm|cm|m)\s*(?:from|off)\s*(?:the\s+)?target\s+surface(?:\s+along\s*([+-][xyz]))?",
+        r"(?:from|off)\s*(?:the\s+)?target\s+surface\s*by\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)(?:\s+along\s*([+-][xyz]))?",
     ]
     axis_map = {
         "+x": ([20.0, 0.0, 0.0], [-1.0, 0.0, 0.0]),
@@ -356,6 +360,27 @@ def _parse_direction_relation_from_position(text: str, position: dict | None) ->
                 -float(value[2]) / magnitude,
             ],
         }
+    return None
+
+
+def _parse_direction_relation_from_axis(text: str) -> dict | None:
+    low = text.lower()
+    axis_match = re.search(r"\balong\s*([+-][xyz])", low)
+    if not axis_match:
+        return None
+    axis = axis_match.group(1).lower()
+    axis_map = {
+        "+x": [-1.0, 0.0, 0.0],
+        "-x": [1.0, 0.0, 0.0],
+        "+y": [0.0, -1.0, 0.0],
+        "-y": [0.0, 1.0, 0.0],
+        "+z": [0.0, 0.0, -1.0],
+        "-z": [0.0, 0.0, 1.0],
+    }
+    if "toward target face" in low or "towards target face" in low or "normal to target face" in low:
+        value = axis_map.get(axis)
+        if value is not None:
+            return {"type": "vector", "value": value}
     return None
 
 
@@ -511,6 +536,16 @@ def extract_candidates_from_normalized_text(
                 "\u534a\u5f84",
             ],
         )
+        if radius is None:
+            diameter = _parse_named_length_mm(
+                merged_text,
+                [
+                    "diameter",
+                    "\u76f4\u5f84",
+                ],
+            )
+            if diameter is not None:
+                radius = diameter / 2.0
         if radius is not None:
             updates.append(
                 UpdateOp(
@@ -705,7 +740,8 @@ def extract_candidates_from_normalized_text(
             )
         )
     direction = _parse_vector(merged_text, "direction")
-    if direction is None and relative_dir is None and relative_target_dir is None:
+    axis_relation_direction = _parse_direction_relation_from_axis(merged_text)
+    if direction is None and relative_dir is None and relative_target_dir is None and axis_relation_direction is None:
         direction = _parse_direction_shorthand(merged_text)
     if direction is None and at_dir is not None:
         direction = at_dir
@@ -715,6 +751,8 @@ def extract_candidates_from_normalized_text(
         direction = relative_target_dir
     if direction is None:
         direction = _parse_direction_relation_from_position(merged_text, pos)
+    if direction is None:
+        direction = axis_relation_direction
     if direction is not None:
         updates.append(
             UpdateOp(

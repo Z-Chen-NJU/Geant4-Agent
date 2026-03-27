@@ -74,6 +74,28 @@ class V2RealPromptRegressionTests(unittest.TestCase):
         self.assertEqual(out["config"]["source"]["position"]["value"], [0.0, 0.0, -20.0])
         self.assertEqual(out["config"]["source"]["direction"]["value"], [0.0, 0.0, 1.0])
 
+    def test_cylinder_shorthand_prompt_is_understood_by_v2(self) -> None:
+        out = self._run(
+            "radius 5 mm, height 20 mm copper cylinder; "
+            "gamma point source 1 MeV at (0,0,-20) mm along +z; "
+            "physics FTFP_BERT; output json."
+        )
+        self.assertTrue(out["is_complete"])
+        self.assertEqual(out["config"]["geometry"]["structure"], "single_tubs")
+        self.assertEqual(out["config"]["geometry"]["params"]["child_rmax"], 5.0)
+        self.assertEqual(out["config"]["geometry"]["params"]["child_hz"], 10.0)
+
+    def test_in_front_of_target_source_phrase_is_understood_by_v2(self) -> None:
+        out = self._run(
+            "10 mm x 10 mm x 10 mm copper box target; "
+            "gamma point source 1 MeV 5 mm in front of the target along -z; "
+            "physics FTFP_BERT; output json."
+        )
+        self.assertTrue(out["is_complete"])
+        self.assertEqual(out["config"]["source"]["type"], "point")
+        self.assertEqual(out["config"]["source"]["position"]["value"], [0.0, 0.0, -5.0])
+        self.assertEqual(out["config"]["source"]["direction"]["value"], [0.0, 0.0, 1.0])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -204,6 +204,73 @@ class LlmSlotFrameTest(unittest.TestCase):
         self.assertEqual(frame.source.position_mm, [0.0, 0.0, -20.0])
         self.assertEqual(frame.source.direction_vec, [0.0, 0.0, 1.0])
 
+    def test_parse_slot_payload_applies_cylinder_candidate_full_length(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 0.7,
+            "normalized_text": "radius 5 mm height 20 mm copper cylinder",
+            "target_slots": ["geometry.kind"],
+            "slots": {"geometry": {"kind": "cylinder"}},
+            "candidates": {
+                "geometry": {
+                    "kind_candidate": "cylinder",
+                    "radius_mm": 5,
+                    "full_length_mm": 20,
+                }
+            },
+        }
+        frame, meta = parse_slot_payload(payload)
+        self.assertIsNotNone(frame)
+        assert frame is not None
+        self.assertEqual(meta.get("schema_errors"), [])
+        self.assertEqual(frame.geometry.kind, "cylinder")
+        self.assertEqual(frame.geometry.radius_mm, 5.0)
+        self.assertEqual(frame.geometry.half_length_mm, 10.0)
+
+    def test_parse_slot_payload_applies_orb_candidate_radius(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 0.7,
+            "normalized_text": "5 cm lead sphere",
+            "target_slots": ["geometry.kind"],
+            "slots": {"geometry": {"kind": "orb"}},
+            "candidates": {
+                "geometry": {
+                    "kind_candidate": "orb",
+                    "radius_mm": 50,
+                }
+            },
+        }
+        frame, meta = parse_slot_payload(payload)
+        self.assertIsNotNone(frame)
+        assert frame is not None
+        self.assertEqual(meta.get("schema_errors"), [])
+        self.assertEqual(frame.geometry.kind, "orb")
+        self.assertEqual(frame.geometry.radius_mm, 50.0)
+
+    def test_parse_slot_payload_applies_source_in_front_candidate(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 0.7,
+            "normalized_text": "5 mm in front of the target along -z",
+            "target_slots": ["source.kind", "source.position_mm", "source.direction_vec"],
+            "slots": {"source": {"kind": "point"}},
+            "candidates": {
+                "source": {
+                    "relation": "in_front_of_target",
+                    "offset_mm": 5,
+                    "axis": "-z",
+                    "direction_mode": "toward_target_face_normal",
+                }
+            },
+        }
+        frame, meta = parse_slot_payload(payload)
+        self.assertIsNotNone(frame)
+        assert frame is not None
+        self.assertEqual(meta.get("schema_errors"), [])
+        self.assertEqual(frame.source.position_mm, [0.0, 0.0, -5.0])
+        self.assertEqual(frame.source.direction_vec, [0.0, 0.0, 1.0])
+
     def test_cylinder_half_length_maps_to_child_hz(self) -> None:
         payload = {
             "intent": "SET",

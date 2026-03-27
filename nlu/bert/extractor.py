@@ -311,6 +311,33 @@ def _parse_relative_center_source(text: str) -> tuple[dict | None, dict | None]:
     return None, None
 
 
+def _parse_relative_target_source(text: str) -> tuple[dict | None, dict | None]:
+    patterns = [
+        r"([-+]?\d*\.?\d+)\s*(mm|cm|m)\s*(?:in front of|upstream of)\s*(?:the\s+)?target(?:\s+along\s*([+-][xyz]))?",
+        r"(?:in front of|upstream of)\s*(?:the\s+)?target\s*by\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)(?:\s+along\s*([+-][xyz]))?",
+    ]
+    axis_map = {
+        "+x": ([20.0, 0.0, 0.0], [-1.0, 0.0, 0.0]),
+        "-x": ([-20.0, 0.0, 0.0], [1.0, 0.0, 0.0]),
+        "+y": ([0.0, 20.0, 0.0], [0.0, -1.0, 0.0]),
+        "-y": ([0.0, -20.0, 0.0], [0.0, 1.0, 0.0]),
+        "+z": ([0.0, 0.0, 20.0], [0.0, 0.0, -1.0]),
+        "-z": ([0.0, 0.0, -20.0], [0.0, 0.0, 1.0]),
+    }
+    for pattern in patterns:
+        match = re.search(pattern, text.lower(), flags=re.IGNORECASE)
+        if not match:
+            continue
+        distance = _value_to_mm(float(match.group(1)), match.group(2))
+        axis = (match.group(3) or "-z").lower()
+        position, direction = axis_map.get(axis, axis_map["-z"])
+        scale = distance / 20.0
+        pos = {"type": "vector", "value": [component * scale for component in position]}
+        dir_vec = {"type": "vector", "value": direction}
+        return pos, dir_vec
+    return None, None
+
+
 def extract_candidates_from_normalized_text(
     normalized_text: str,
     *,
@@ -485,6 +512,20 @@ def extract_candidates_from_normalized_text(
                 "\u534a\u9ad8",
             ],
         )
+        if half_len is None:
+            full_len = _parse_named_length_mm(
+                merged_text,
+                [
+                    "height",
+                    "full length",
+                    "full-length",
+                    "length",
+                    "\u9ad8",
+                    "\u5168\u957f",
+                ],
+            )
+            if full_len is not None:
+                half_len = full_len / 2.0
         if half_len is not None:
             updates.append(
                 UpdateOp(
@@ -620,7 +661,14 @@ def extract_candidates_from_normalized_text(
             )
         )
     relative_pos, relative_dir = _parse_relative_center_source(merged_text)
-    pos = _parse_vector(merged_text, "position") or _parse_at_position(merged_text) or relative_pos or _parse_position_shorthand(merged_text)
+    relative_target_pos, relative_target_dir = _parse_relative_target_source(merged_text)
+    pos = (
+        _parse_vector(merged_text, "position")
+        or _parse_at_position(merged_text)
+        or relative_pos
+        or relative_target_pos
+        or _parse_position_shorthand(merged_text)
+    )
     at_pos, at_dir = _parse_at_to(merged_text)
     if pos is None and at_pos is not None:
         pos = at_pos
@@ -636,12 +684,14 @@ def extract_candidates_from_normalized_text(
             )
         )
     direction = _parse_vector(merged_text, "direction")
-    if direction is None and relative_dir is None:
+    if direction is None and relative_dir is None and relative_target_dir is None:
         direction = _parse_direction_shorthand(merged_text)
     if direction is None and at_dir is not None:
         direction = at_dir
     if direction is None and relative_dir is not None:
         direction = relative_dir
+    if direction is None and relative_target_dir is not None:
+        direction = relative_target_dir
     if direction is not None:
         updates.append(
             UpdateOp(

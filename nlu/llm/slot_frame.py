@@ -1446,6 +1446,9 @@ def _apply_controlled_candidates(frame: SlotFrame, candidates: dict[str, Any], e
     if isinstance(geometry, dict):
         kind_candidate = _canonical_geometry_kind(geometry.get("kind_candidate"))
         side_length = _coerce_length_mm(geometry.get("side_length_mm"))
+        radius_mm = _coerce_length_mm(geometry.get("radius_mm"))
+        half_length_mm = _coerce_length_mm(geometry.get("half_length_mm"))
+        full_length_mm = _coerce_length_mm(geometry.get("full_length_mm"))
         if frame.geometry.kind is None and kind_candidate is not None:
             frame.geometry.kind = kind_candidate
             frame.notes.append(f"candidate.geometry.kind:{kind_candidate}")
@@ -1456,6 +1459,24 @@ def _apply_controlled_candidates(frame: SlotFrame, candidates: dict[str, Any], e
         ):
             frame.geometry.size_triplet_mm = [side_length, side_length, side_length]
             frame.notes.append(f"candidate.geometry.side_length_mm:{side_length}")
+        if frame.geometry.kind == "cylinder":
+            if frame.geometry.radius_mm is None and radius_mm is not None:
+                frame.geometry.radius_mm = radius_mm
+                frame.notes.append(f"candidate.geometry.radius_mm:{radius_mm}")
+            resolved_half_length = half_length_mm
+            if resolved_half_length is None and full_length_mm is not None:
+                resolved_half_length = full_length_mm / 2.0
+                frame.notes.append(
+                    f"candidate.geometry.full_length_mm:{full_length_mm}"
+                )
+            if frame.geometry.half_length_mm is None and resolved_half_length is not None:
+                frame.geometry.half_length_mm = resolved_half_length
+                frame.notes.append(
+                    f"candidate.geometry.half_length_mm:{resolved_half_length}"
+                )
+        if frame.geometry.kind in {"sphere", "orb"} and frame.geometry.radius_mm is None and radius_mm is not None:
+            frame.geometry.radius_mm = radius_mm
+            frame.notes.append(f"candidate.geometry.radius_mm:{radius_mm}")
     elif "geometry" in candidates:
         errors.append("candidate_geometry_not_object")
 
@@ -1465,7 +1486,7 @@ def _apply_controlled_candidates(frame: SlotFrame, candidates: dict[str, Any], e
         offset_mm = _coerce_length_mm(source.get("offset_mm"))
         axis = (_clean_scalar(source.get("axis")) or "").lower()
         direction_mode = (_clean_scalar(source.get("direction_mode")) or "toward_target_center").lower()
-        if relation == "outside_target_center" and offset_mm is not None and axis in _AXIS_VECTORS:
+        if relation in {"outside_target_center", "in_front_of_target", "upstream_of_target"} and offset_mm is not None and axis in _AXIS_VECTORS:
             axis_position, axis_toward_center = _AXIS_VECTORS[axis]
             if frame.source.position_mm is None:
                 frame.source.position_mm = [component * offset_mm for component in axis_position]
@@ -1473,6 +1494,8 @@ def _apply_controlled_candidates(frame: SlotFrame, candidates: dict[str, Any], e
             if frame.source.direction_vec is None:
                 if direction_mode == "along_axis":
                     frame.source.direction_vec = list(axis_position)
+                elif direction_mode == "against_axis":
+                    frame.source.direction_vec = [-component for component in axis_position]
                 else:
                     frame.source.direction_vec = list(axis_toward_center)
                 frame.notes.append(f"candidate.source.direction_mode:{direction_mode}")

@@ -17,6 +17,7 @@ from core.dialogue.renderer import render_dialogue_message
 from core.dialogue.state import build_raw_dialogue, collect_available_explanations, sync_dialogue_state
 from core.dialogue.types import build_dialogue_trace
 from core.geometry.adapters.legacy_compare import compare_slot_frame_geometry
+from core.interpreter import merge_candidates, run_interpreter
 from core.pipelines import (
     build_v2_geometry_updates,
     build_v2_geometry_updates_from_candidate,
@@ -418,6 +419,86 @@ def _merge_v2_meta(existing: Any, incoming: dict[str, Any]) -> dict[str, Any]:
     merged["runtime_ready"] = bool(existing.get("runtime_ready") or incoming.get("runtime_ready"))
     merged["finalization_status"] = str(existing.get("finalization_status") or incoming.get("finalization_status") or "missing")
     return merged
+
+
+def _build_geometry_evidence_from_slot_frame(frame: Any) -> dict[str, Any]:
+    geometry = getattr(frame, "geometry", None)
+    materials = getattr(frame, "materials", None)
+    if geometry is None:
+        return {}
+    dimensions: dict[str, Any] = {}
+    for key in (
+        "size_triplet_mm",
+        "radius_mm",
+        "half_length_mm",
+        "radius1_mm",
+        "radius2_mm",
+        "x1_mm",
+        "x2_mm",
+        "y1_mm",
+        "y2_mm",
+        "z_mm",
+    ):
+        value = getattr(geometry, key, None)
+        if value is not None:
+            dimensions[key] = value
+    return {
+        "kind": getattr(geometry, "kind", None),
+        "material": getattr(materials, "primary", None) if materials is not None else None,
+        "dimensions": dimensions,
+    }
+
+
+def _build_source_evidence_from_slot_frame(frame: Any) -> dict[str, Any]:
+    source = getattr(frame, "source", None)
+    if source is None:
+        return {}
+    position_value = getattr(source, "position_mm", None)
+    direction_value = getattr(source, "direction_vec", None)
+    position = {"position_mm": position_value} if position_value is not None else None
+    direction = (
+        {"mode": "explicit_vector", "hint": {"direction_vec": direction_value}}
+        if direction_value is not None
+        else None
+    )
+    return {
+        "source_type": getattr(source, "kind", None),
+        "particle": getattr(source, "particle", None),
+        "energy_mev": getattr(source, "energy_mev", None),
+        "position": position,
+        "direction": direction,
+    }
+
+
+def _build_interpreter_sidecar(
+    *,
+    text: str,
+    context_summary: str,
+    slot_frame: Any,
+    ollama_config_path: str,
+) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {"temperature": 0.0}
+    if ollama_config_path:
+        kwargs["config_path"] = ollama_config_path
+    result = run_interpreter(text, context_summary, **kwargs)
+    payload: dict[str, Any] = {
+        "ok": result.ok,
+        "fallback_reason": result.fallback_reason,
+        "turn_summary": result.parsed.turn_summary.to_payload(),
+        "geometry_candidate": result.parsed.geometry_candidate.to_payload(),
+        "source_candidate": result.parsed.source_candidate.to_payload(),
+    }
+    if slot_frame is None:
+        return payload
+    merged = merge_candidates(
+        result.parsed.turn_summary,
+        result.parsed.geometry_candidate,
+        result.parsed.source_candidate,
+        geometry_evidence=_build_geometry_evidence_from_slot_frame(slot_frame),
+        source_evidence=_build_source_evidence_from_slot_frame(slot_frame),
+    )
+    payload["merged"] = merged.to_payload()
+    return payload
 
 
 def _prioritize_v2_compile_questions(
@@ -898,6 +979,7 @@ def process_turn(
     normalize_input = bool(payload.get("normalize_input", True))
     apply_autofix = bool(payload.get("autofix", False))
     enable_compare = bool(payload.get("enable_compare", True))
+    enable_interpreter = bool(payload.get("enable_interpreter", False))
     enable_llm_first = bool(llm_router and normalize_input)
     llm_used = False
     fallback_reason = E_LLM_ROUTER_DISABLED if (not llm_router and normalize_input) else "E_LLM_DISABLED"
@@ -907,6 +989,7 @@ def process_turn(
     slot_debug: dict[str, Any] = {}
     geometry_compare: dict[str, Any] | None = None
     source_compare: dict[str, Any] | None = None
+    interpreter_debug: dict[str, Any] | None = None
     debug: dict[str, Any] = {"graph_candidates": []}
     semantic_missing_paths = list(state.semantic_missing_paths)
     normalized_text = text
@@ -959,6 +1042,19 @@ def process_turn(
             if enable_compare:
                 geometry_compare = compare_slot_frame_geometry(slot_result.frame, turn_id=state.turn_id)
                 source_compare = compare_slot_frame_source(slot_result.frame, turn_id=state.turn_id)
+            if enable_interpreter:
+                try:
+                    interpreter_debug = _build_interpreter_sidecar(
+                        text=text,
+                        context_summary=context_summary,
+                        slot_frame=slot_result.frame,
+                        ollama_config_path=ollama_config_path,
+                    )
+                except Exception as exc:
+                    interpreter_debug = {
+                        "ok": False,
+                        "fallback_reason": f"interpreter_sidecar_error:{type(exc).__name__}",
+                    }
             _progress(progress_cb, "semantic_extract", "Extracting semantic candidates", "Runtime semantic extraction from normalized text.")
             extracted_candidate, debug = extract_candidates_from_normalized_text(
                 normalized_text,
@@ -1458,6 +1554,7 @@ def process_turn(
             "slot_debug": slot_debug,
             "geometry_compare": geometry_compare,
             "source_compare": source_compare,
+            "interpreter_debug": interpreter_debug,
             "llm_stage_failures": list(llm_stage_failures),
             "llm_schema_errors": list(llm_schema_errors),
             "llm_raw_preview": str(llm_raw or "")[:2000],
@@ -1517,6 +1614,7 @@ def process_turn(
         "slot_debug": slot_debug,
         "geometry_compare": geometry_compare,
         "source_compare": source_compare,
+        "interpreter_debug": interpreter_debug,
         "temperatures": {
             "internal": internal_temperature,
             "user": user_temperature if llm_question else None,

@@ -473,6 +473,34 @@ def _parse_relative_target_source(text: str) -> tuple[dict | None, dict | None]:
     return None, None
 
 
+def _parse_relative_target_source_unicode(text: str) -> tuple[dict | None, dict | None]:
+    patterns = [
+        r"\u8ddd\u9776\u9762\u524d\u65b9\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)(?:\s*(?:\u6cbf|\u671d)\s*([+-][xyz])(?:\s*\u65b9\u5411)?)?",
+        r"\u8ddd\u9776\u524d\u8868\u9762\u5916\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)(?:\s*(?:\u6cbf|\u671d)\s*([+-][xyz])(?:\s*\u65b9\u5411)?)?",
+        r"\u8ddd(?:\u9776|\u76ee\u6807)\u8868\u9762\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)(?:\s*(?:\u6cbf|\u671d)\s*([+-][xyz])(?:\s*\u65b9\u5411)?)?",
+    ]
+    axis_map = {
+        "+x": ([20.0, 0.0, 0.0], [-1.0, 0.0, 0.0]),
+        "-x": ([-20.0, 0.0, 0.0], [1.0, 0.0, 0.0]),
+        "+y": ([0.0, 20.0, 0.0], [0.0, -1.0, 0.0]),
+        "-y": ([0.0, -20.0, 0.0], [0.0, 1.0, 0.0]),
+        "+z": ([0.0, 0.0, 20.0], [0.0, 0.0, -1.0]),
+        "-z": ([0.0, 0.0, -20.0], [0.0, 0.0, 1.0]),
+    }
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if not match:
+            continue
+        distance = _value_to_mm(float(match.group(1)), match.group(2))
+        axis = (match.group(3) or "-z").lower()
+        position, direction = axis_map.get(axis, axis_map["-z"])
+        scale = distance / 20.0
+        pos = {"type": "vector", "value": [component * scale for component in position]}
+        dir_vec = {"type": "vector", "value": direction}
+        return pos, dir_vec
+    return None, None
+
+
 def _parse_direction_relation_from_position(text: str, position: dict | None) -> dict | None:
     if not isinstance(position, dict):
         return None
@@ -526,6 +554,34 @@ def _parse_direction_relation_from_axis(text: str) -> dict | None:
         or "朝靶面法线方向" in text
         or "沿靶面法线方向" in text
         or "朝靶面方向" in text
+    ):
+        value = axis_map.get(axis)
+        if value is not None:
+            return {"type": "vector", "value": value}
+    return None
+
+
+def _parse_direction_relation_from_axis_unicode(text: str) -> dict | None:
+    axis_match = re.search(r"(?:\u6cbf|\u671d)\s*([+-][xyz])(?:\s*\u65b9\u5411)?", text)
+    if not axis_match:
+        return None
+    axis = axis_match.group(1).lower()
+    axis_map = {
+        "+x": [-1.0, 0.0, 0.0],
+        "-x": [1.0, 0.0, 0.0],
+        "+y": [0.0, -1.0, 0.0],
+        "-y": [0.0, 1.0, 0.0],
+        "+z": [0.0, 0.0, -1.0],
+        "-z": [0.0, 0.0, 1.0],
+    }
+    if any(
+        token in text
+        for token in (
+            "\u671d\u9776\u9762\u6cd5\u7ebf\u65b9\u5411",
+            "\u6cbf\u9776\u9762\u6cd5\u7ebf\u65b9\u5411",
+            "\u671d\u9776\u9762\u65b9\u5411",
+            "\u6cbf\u675f\u6d41\u8f74",
+        )
     ):
         value = axis_map.get(axis)
         if value is not None:
@@ -661,6 +717,10 @@ def extract_candidates_from_normalized_text(
             if pair is not None and any(token in merged_text.lower() for token in ("plate", "slab")):
                 triplet = [pair[0], pair[1], 1.0]
             elif pair is not None and any(token in merged_text for token in ("板", "薄片", "薄板")):
+                triplet = [pair[0], pair[1], 1.0]
+        if triplet is None and resolved_structure == "single_box":
+            pair = _parse_module_pair_mm(merged_text)
+            if pair is not None and any(token in merged_text for token in ("板", "薄片", "薄板", "平板")):
                 triplet = [pair[0], pair[1], 1.0]
         if triplet is None and resolved_structure == "single_box":
             thickness = _parse_named_length_mm(
@@ -893,6 +953,8 @@ def extract_candidates_from_normalized_text(
         )
     relative_pos, relative_dir = _parse_relative_center_source(merged_text)
     relative_target_pos, relative_target_dir = _parse_relative_target_source(merged_text)
+    if relative_target_pos is None and relative_target_dir is None:
+        relative_target_pos, relative_target_dir = _parse_relative_target_source_unicode(merged_text)
     pos = (
         _parse_vector(merged_text, "position")
         or _parse_at_position(merged_text)
@@ -918,6 +980,8 @@ def extract_candidates_from_normalized_text(
         )
     direction = _parse_vector(merged_text, "direction")
     axis_relation_direction = _parse_direction_relation_from_axis(merged_text)
+    if axis_relation_direction is None:
+        axis_relation_direction = _parse_direction_relation_from_axis_unicode(merged_text)
     if direction is None and relative_dir is None and relative_target_dir is None and axis_relation_direction is None:
         direction = _parse_direction_shorthand(merged_text)
     if direction is None and at_dir is not None:

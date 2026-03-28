@@ -16,20 +16,22 @@ class InterpreterPromptTests(unittest.TestCase):
         self.assertIn('"geometry_candidate"', prompt)
         self.assertIn('"source_candidate"', prompt)
         self.assertIn("Geometry and source are interpreted candidates only", prompt)
+        self.assertIn("Bind geometry_candidate to the target/object being built.", prompt)
 
     def test_prompt_switches_to_chinese_template(self) -> None:
         prompt = build_interpreter_prompt(
-            "做一个铜靶，10 mm 见方，gamma点源1 MeV，位于(0,0,-20) mm，朝+z方向。",
+            "\u505a\u4e00\u4e2a\u94dc\u9776\uff0c10 mm \u89c1\u65b9\uff0cgamma\u70b9\u6e901 MeV\uff0c\u4f4d\u4e8e(0,0,-20) mm\uff0c\u671d+z\u65b9\u5411\u3002",
             "phase=geometry source=missing",
         )
-        self.assertIn("请解释这轮 Geant4 配置请求真正表达的意思", prompt)
-        self.assertIn("不要输出最终 config path", prompt)
-        self.assertIn('用户: "10 mm x 20 mm x 30 mm 铜盒靶"', prompt)
+        self.assertIn("\u8bf7\u89e3\u91ca\u8fd9\u8f6e Geant4 \u914d\u7f6e\u8bf7\u6c42\u771f\u6b63\u8868\u8fbe\u7684\u610f\u601d", prompt)
+        self.assertIn("\u4e0d\u8981\u8f93\u51fa\u6700\u7ec8 config path", prompt)
+        self.assertIn("\u201c10 mm \u89c1\u65b9\u9776\u201d", prompt)
+        self.assertIn("\u5982\u679c\u540c\u4e00\u53e5\u91cc\u65e2\u6709\u9776\u53c8\u6709\u6e90", prompt)
 
     def test_language_detector_distinguishes_en_zh_and_mixed(self) -> None:
         self.assertEqual(detect_prompt_language("copper box target"), "en")
-        self.assertEqual(detect_prompt_language("铜盒靶"), "zh")
-        self.assertEqual(detect_prompt_language("10 mm copper box 铜靶"), "mixed")
+        self.assertEqual(detect_prompt_language("\u94dc\u76d2\u9776"), "zh")
+        self.assertEqual(detect_prompt_language("10 mm copper box \u94dc\u9776"), "mixed")
 
     def test_parser_builds_candidate_objects(self) -> None:
         raw = """

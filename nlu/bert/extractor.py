@@ -129,6 +129,8 @@ def _infer_structure_from_text(text: str) -> str | None:
         ]
     ):
         return "single_box"
+    if any(k in low for k in ["slab", "plate", "\u677f", "\u8584\u7247", "\u8584\u677f"]):
+        return "single_box"
     if any(k in low for k in ["cylinder", "tubs", "\u5706\u67f1"]):
         return "single_tubs"
     if re.search(r"(?<![a-z0-9_])orb(?![a-z0-9_])", low):
@@ -377,7 +379,13 @@ def _parse_direction_relation_from_axis(text: str) -> dict | None:
         "+z": [0.0, 0.0, -1.0],
         "-z": [0.0, 0.0, 1.0],
     }
-    if "toward target face" in low or "towards target face" in low or "normal to target face" in low:
+    if (
+        "toward target face" in low
+        or "towards target face" in low
+        or "normal to target face" in low
+        or "toward target surface normal" in low
+        or "towards target surface normal" in low
+    ):
         value = axis_map.get(axis)
         if value is not None:
             return {"type": "vector", "value": value}
@@ -499,6 +507,18 @@ def extract_candidates_from_normalized_text(
         triplet = _parse_module_triplet_mm(merged_text)
         if triplet is None and (resolved_structure == "single_box" or any(token in merged_text.lower() for token in ("box", "cube", "cuboid"))):
             triplet = _parse_box_side_mm(merged_text)
+        if triplet is None and resolved_structure == "single_box":
+            thickness = _parse_named_length_mm(
+                merged_text,
+                [
+                    "thickness",
+                    "thick",
+                    "\u539a",
+                    "\u539a\u5ea6",
+                ],
+            )
+            if thickness is not None:
+                triplet = [10.0, 10.0, thickness]
         if triplet is not None:
             updates.extend(
                 [

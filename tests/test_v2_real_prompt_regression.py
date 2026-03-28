@@ -135,6 +135,25 @@ class V2RealPromptRegressionTests(unittest.TestCase):
         self.assertTrue(out["is_complete"])
         self.assertEqual(out["config"]["source"]["direction"]["value"], [0.0, 0.0, 1.0])
 
+    def test_thick_slab_phrase_is_understood_by_v2(self) -> None:
+        out = self._run(
+            "2 mm thick lead slab; "
+            "gamma point source 1 MeV at (0,0,-20) mm along +z; "
+            "physics FTFP_BERT; output json."
+        )
+        self.assertTrue(out["is_complete"])
+        self.assertEqual(out["config"]["geometry"]["structure"], "single_box")
+        self.assertEqual(out["config"]["geometry"]["params"]["module_z"], 2.0)
+
+    def test_target_surface_normal_phrase_is_understood_by_v2(self) -> None:
+        out = self._run(
+            "10 mm x 10 mm x 10 mm copper box target; "
+            "gamma beam 1 MeV at (0,0,-20) mm toward target surface normal along -z; "
+            "physics FTFP_BERT; output json."
+        )
+        self.assertTrue(out["is_complete"])
+        self.assertEqual(out["config"]["source"]["direction"]["value"], [0.0, 0.0, 1.0])
+
 
 if __name__ == "__main__":
     unittest.main()

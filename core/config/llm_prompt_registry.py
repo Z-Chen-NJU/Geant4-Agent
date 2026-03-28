@@ -69,8 +69,8 @@ def _build_strict_slot_prompt_v2(user_text: str, context_summary: str) -> str:
         '    "output": {"format": "csv|hdf5|root|xml|json|null", "path": null}\n'
         '  },\n'
         '  "candidates": {\n'
-        '    "geometry": {"kind_candidate": "box|cylinder|sphere|orb|cons|trd|polycone|polyhedra|cuttubs|trap|para|torus|ellipsoid|elltube|null", "side_length_mm": null, "radius_mm": null, "diameter_mm": null, "half_length_mm": null, "full_length_mm": null},\n'
-        '    "source": {"relation": "outside_target_center|in_front_of_target|upstream_of_target|null", "offset_mm": null, "axis": "+x|-x|+y|-y|+z|-z|null", "direction_mode": "toward_target_center|toward_target_face|toward_target_face_normal|normal_to_target_face|along_axis|against_axis|null", "direction_relation": "toward_target_center|normal_to_target_face|null"}\n'
+        '    "geometry": {"kind_candidate": "box|cylinder|sphere|orb|cons|trd|polycone|polyhedra|cuttubs|trap|para|torus|ellipsoid|elltube|null", "side_length_mm": null, "radius_mm": null, "diameter_mm": null, "half_length_mm": null, "full_length_mm": null, "thickness_mm": null, "plate_size_xy_mm": [null,null]},\n'
+        '    "source": {"relation": "outside_target_center|in_front_of_target|upstream_of_target|null", "offset_mm": null, "axis": "+x|-x|+y|-y|+z|-z|null", "direction_mode": "toward_target_center|toward_target_face|toward_target_face_normal|normal_to_target_face|along_axis|against_axis|null", "direction_relation": "toward_target_center|toward_target_face|normal_to_target_face|toward_target_surface_normal|null"}\n'
         "  }\n"
         "}\n"
         "Hard rules:\n"
@@ -121,6 +121,10 @@ def _build_strict_slot_prompt_v2(user_text: str, context_summary: str) -> str:
         '  JSON slots.geometry may stay partial, but JSON candidates.geometry = {"kind_candidate":"orb","radius_mm":50}\n'
         '- User: "20 mm sphere"\n'
         '  JSON slots.geometry may stay partial, but JSON candidates.geometry = {"kind_candidate":"orb","diameter_mm":20}\n'
+        '- User: "2 mm thick lead slab"\n'
+        '  JSON slots.geometry may stay partial, but JSON candidates.geometry = {"kind_candidate":"box","thickness_mm":2}\n'
+        '- User: "10 mm x 20 mm plate"\n'
+        '  JSON slots.geometry may stay partial, but JSON candidates.geometry = {"kind_candidate":"box","plate_size_xy_mm":[10,20]}\n'
         '- User: "20 mm outside the target center along -z"\n'
         '  JSON candidates.source = {"relation":"outside_target_center","offset_mm":20,"axis":"-z","direction_mode":"toward_target_center"}\n'
         '- User: "5 mm in front of the target along -z"\n'
@@ -133,6 +137,8 @@ def _build_strict_slot_prompt_v2(user_text: str, context_summary: str) -> str:
         '  JSON candidates.source = {"direction_relation":"toward_target_center"}\n'
         '- User: "point source at (0,0,-20) mm toward target face along -z"\n'
         '  JSON candidates.source = {"axis":"-z","direction_relation":"toward_target_face"}\n'
+        '- User: "beam toward target surface normal along -z"\n'
+        '  JSON candidates.source = {"axis":"-z","direction_relation":"toward_target_surface_normal"}\n'
         '- User: "beam normal to target face along -z"\n'
         '  JSON candidates.source = {"axis":"-z","direction_relation":"normal_to_target_face"}\n'
         '- User: "Output json."\n'

@@ -261,6 +261,32 @@ def _coerce_vec3(value: Any, *, metric: bool) -> list[float] | None:
         return None
 
 
+def _coerce_pair_mm(value: Any) -> list[float] | None:
+    if isinstance(value, list) and len(value) == 2:
+        try:
+            return [float(value[0]), float(value[1])]
+        except Exception:
+            return None
+    text = str(value or "").strip().lower().replace("\u00d7", "x")
+    if not text or text in _NULL_LITERALS:
+        return None
+    num = r"[-+]?\d*\.?\d+"
+    unit = r"(mm|cm|m)"
+    m1 = re.fullmatch(rf"({num})\s*{unit}\s*[,x]\s*({num})\s*{unit}", text)
+    if m1:
+        return [
+            _to_mm(float(m1.group(1)), m1.group(2)),
+            _to_mm(float(m1.group(3)), m1.group(4)),
+        ]
+    m2 = re.fullmatch(rf"({num})\s*[,x]\s*({num})\s*{unit}", text)
+    if m2:
+        return [
+            _to_mm(float(m2.group(1)), m2.group(3)),
+            _to_mm(float(m2.group(2)), m2.group(3)),
+        ]
+    return None
+
+
 def _canonical_material(value: Any) -> str | None:
     text = _clean_scalar(value)
     if not text:
@@ -1457,6 +1483,8 @@ def _apply_controlled_candidates(frame: SlotFrame, candidates: dict[str, Any], e
         diameter_mm = _coerce_length_mm(geometry.get("diameter_mm"))
         half_length_mm = _coerce_length_mm(geometry.get("half_length_mm"))
         full_length_mm = _coerce_length_mm(geometry.get("full_length_mm"))
+        thickness_mm = _coerce_length_mm(geometry.get("thickness_mm"))
+        plate_size_xy_mm = _coerce_pair_mm(geometry.get("plate_size_xy_mm"))
         if frame.geometry.kind is None and kind_candidate is not None:
             frame.geometry.kind = kind_candidate
             frame.notes.append(f"candidate.geometry.kind:{kind_candidate}")
@@ -1467,6 +1495,15 @@ def _apply_controlled_candidates(frame: SlotFrame, candidates: dict[str, Any], e
         ):
             frame.geometry.size_triplet_mm = [side_length, side_length, side_length]
             frame.notes.append(f"candidate.geometry.side_length_mm:{side_length}")
+        if frame.geometry.kind == "box" and frame.geometry.size_triplet_mm is None:
+            if thickness_mm is not None:
+                frame.geometry.size_triplet_mm = [10.0, 10.0, thickness_mm]
+                frame.notes.append(f"candidate.geometry.thickness_mm:{thickness_mm}")
+            elif isinstance(plate_size_xy_mm, list) and len(plate_size_xy_mm) >= 2:
+                frame.geometry.size_triplet_mm = [plate_size_xy_mm[0], plate_size_xy_mm[1], 1.0]
+                frame.notes.append(
+                    f"candidate.geometry.plate_size_xy_mm:{plate_size_xy_mm[0]}:{plate_size_xy_mm[1]}"
+                )
         if frame.geometry.kind == "cylinder":
             resolved_radius = radius_mm
             if resolved_radius is None and diameter_mm is not None:
@@ -1518,7 +1555,7 @@ def _apply_controlled_candidates(frame: SlotFrame, candidates: dict[str, Any], e
                     frame.source.direction_vec = list(axis_toward_center)
                 frame.notes.append(f"candidate.source.direction_mode:{direction_mode}")
         if frame.source.direction_vec is None and direction_relation:
-            if direction_relation in {"normal_to_target_face", "toward_target_face"} and axis in _AXIS_VECTORS:
+            if direction_relation in {"normal_to_target_face", "toward_target_face", "toward_target_surface_normal"} and axis in _AXIS_VECTORS:
                 _, axis_toward_center = _AXIS_VECTORS[axis]
                 frame.source.direction_vec = list(axis_toward_center)
                 frame.notes.append(f"candidate.source.direction_relation:{direction_relation}")

@@ -375,6 +375,46 @@ class LlmSlotFrameTest(unittest.TestCase):
         self.assertEqual(meta.get("schema_errors"), [])
         self.assertEqual(frame.source.direction_vec, [0.0, 0.0, 1.0])
 
+    def test_parse_slot_payload_applies_box_thickness_candidate(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 0.7,
+            "normalized_text": "2 mm thick lead slab",
+            "target_slots": ["geometry.kind"],
+            "slots": {"geometry": {"kind": "box"}},
+            "candidates": {
+                "geometry": {
+                    "kind_candidate": "box",
+                    "thickness_mm": 2,
+                }
+            },
+        }
+        frame, meta = parse_slot_payload(payload)
+        self.assertIsNotNone(frame)
+        assert frame is not None
+        self.assertEqual(meta.get("schema_errors"), [])
+        self.assertEqual(frame.geometry.size_triplet_mm, [10.0, 10.0, 2.0])
+
+    def test_parse_slot_payload_applies_plate_size_candidate(self) -> None:
+        payload = {
+            "intent": "SET",
+            "confidence": 0.7,
+            "normalized_text": "10 mm x 20 mm plate",
+            "target_slots": ["geometry.kind"],
+            "slots": {"geometry": {"kind": "box"}},
+            "candidates": {
+                "geometry": {
+                    "kind_candidate": "box",
+                    "plate_size_xy_mm": [10, 20],
+                }
+            },
+        }
+        frame, meta = parse_slot_payload(payload)
+        self.assertIsNotNone(frame)
+        assert frame is not None
+        self.assertEqual(meta.get("schema_errors"), [])
+        self.assertEqual(frame.geometry.size_triplet_mm, [10.0, 20.0, 1.0])
+
     def test_cylinder_half_length_maps_to_child_hz(self) -> None:
         payload = {
             "intent": "SET",

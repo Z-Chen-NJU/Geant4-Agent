@@ -121,6 +121,16 @@ def _parse_named_length_mm(text: str, keys: list[str]) -> float | None:
     return _value_to_mm(float(m.group(1)), m.group(2))
 
 
+def _parse_box_side_unicode_mm(text: str) -> tuple[float, float, float] | None:
+    m = re.search(r"([-+]?\d*\.?\d+)\s*(mm|cm|m)\s*\u89c1\u65b9", text)
+    if not m:
+        m = re.search(r"\u8fb9\u957f\s*[:\uff1a]?\s*([-+]?\d*\.?\d+)\s*(mm|cm|m)", text)
+    if not m:
+        return None
+    side = _value_to_mm(float(m.group(1)), m.group(2))
+    return side, side, side
+
+
 def _infer_structure_from_text(text: str) -> str | None:
     low = text.lower()
     if any(
@@ -174,6 +184,12 @@ def _infer_structure_from_text(text: str) -> str | None:
     return None
 
 
+def _infer_structure_unicode_fallback(text: str) -> str | None:
+    if "\u89c1\u65b9" in text:
+        return "single_box"
+    return None
+
+
 def _infer_structure_fallback(text: str) -> str | None:
     if "见方" in text:
         return "single_box"
@@ -190,6 +206,32 @@ def _infer_particle(text: str) -> str | None:
         return "proton"
     if "neutron" in low or "\u4e2d\u5b50" in low:
         return "neutron"
+    return None
+
+
+def _infer_material_unicode_fallback(text: str) -> str | None:
+    if "\u94dc" in text:
+        return "G4_Cu"
+    if "\u94c5" in text:
+        return "G4_Pb"
+    if "\u94dd" in text:
+        return "G4_Al"
+    if "\u7845" in text:
+        return "G4_Si"
+    if "\u94c1" in text:
+        return "G4_Fe"
+    if "\u94a8" in text:
+        return "G4_W"
+    if "\u7a7a\u6c14" in text:
+        return "G4_AIR"
+    if "\u6df7\u51dd\u571f" in text:
+        return "G4_CONCRETE"
+    if "\u6c34" in text:
+        return "G4_WATER"
+    if "\u4e0d\u9508\u94a2" in text:
+        return "G4_STAINLESS-STEEL"
+    if "\u7898\u5316\u94ef" in text:
+        return "G4_CESIUM_IODIDE"
     return None
 
 
@@ -347,6 +389,15 @@ def _parse_at_position_cn(text: str) -> dict | None:
     return {"type": "vector", "value": [float(m.group(1)), float(m.group(2)), float(m.group(3))]}
 
 
+def _parse_at_position_unicode_cn(text: str) -> dict | None:
+    num = r"[-+]?\d*\.?\d+"
+    pat = rf"(?:\u4f4d\u4e8e|\u4f4d\u65bc)\s*\(\s*({num})\s*[,，]\s*({num})\s*[,，]\s*({num})\s*\)\s*(?:mm|cm|m)?"
+    m = re.search(pat, text)
+    if not m:
+        return None
+    return {"type": "vector", "value": [float(m.group(1)), float(m.group(2)), float(m.group(3))]}
+
+
 def _parse_at_to(text: str) -> tuple[dict | None, dict | None]:
     num = r"[-+]?\d*\.?\d+"
     pat = (
@@ -428,7 +479,14 @@ def _parse_direction_relation_from_position(text: str, position: dict | None) ->
     value = position.get("value")
     if not isinstance(value, list) or len(value) < 3:
         return None
-    if "toward target center" in text.lower() or "towards target center" in text.lower():
+    if (
+        "toward target center" in text.lower()
+        or "towards target center" in text.lower()
+        or "\u671d\u9776\u5fc3" in text
+        or "\u671d\u9776\u4e2d\u5fc3" in text
+        or "\u671d\u5411\u9776\u5fc3" in text
+        or "\u671d\u5411\u9776\u4e2d\u5fc3" in text
+    ):
         magnitude = sum(float(component) * float(component) for component in value) ** 0.5
         if magnitude <= 1e-9:
             return None
@@ -573,7 +631,11 @@ def extract_candidates_from_normalized_text(
         if not resolved_structure and graph_structure:
             resolved_structure = graph_structure
     if not frame.geometry.structure or resolved_structure == "unknown":
-        inferred_structure = _infer_structure_from_text(merged_text) or _infer_structure_fallback(merged_text)
+        inferred_structure = (
+            _infer_structure_from_text(merged_text)
+            or _infer_structure_fallback(merged_text)
+            or _infer_structure_unicode_fallback(merged_text)
+        )
         if inferred_structure:
             updates.append(
                 UpdateOp(
@@ -592,6 +654,8 @@ def extract_candidates_from_normalized_text(
             triplet = _parse_box_side_mm(merged_text)
         if triplet is None and resolved_structure == "single_box":
             triplet = _parse_box_side_cn_mm(merged_text)
+        if triplet is None and resolved_structure == "single_box":
+            triplet = _parse_box_side_unicode_mm(merged_text)
         if triplet is None and resolved_structure == "single_box":
             pair = _parse_module_pair_mm(merged_text)
             if pair is not None and any(token in merged_text.lower() for token in ("plate", "slab")):
@@ -717,7 +781,7 @@ def extract_candidates_from_normalized_text(
             )
         )
     else:
-        m = _infer_material(merged_text) or _infer_material_fallback(merged_text)
+        m = _infer_material(merged_text) or _infer_material_fallback(merged_text) or _infer_material_unicode_fallback(merged_text)
         if m:
             updates.append(
                 UpdateOp(
@@ -833,6 +897,7 @@ def extract_candidates_from_normalized_text(
         _parse_vector(merged_text, "position")
         or _parse_at_position(merged_text)
         or _parse_at_position_cn(merged_text)
+        or _parse_at_position_unicode_cn(merged_text)
         or relative_pos
         or relative_target_pos
         or _parse_position_shorthand(merged_text)

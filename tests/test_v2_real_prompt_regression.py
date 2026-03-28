@@ -186,6 +186,26 @@ class V2RealPromptRegressionTests(unittest.TestCase):
         self.assertEqual(out["config"]["source"]["position"]["value"], [0.0, 0.0, -5.0])
         self.assertEqual(out["config"]["source"]["direction"]["value"], [0.0, 0.0, 1.0])
 
+    def test_chinese_cylinder_phrase_is_understood_by_v2(self) -> None:
+        out = self._run(
+            "半径 5 mm、高 20 mm 的铜圆柱；"
+            "gamma 点源 1 MeV，位于 (0,0,-20) mm，沿 +z 方向；"
+            "物理列表 FTFP_BERT；输出 json。"
+        )
+        self.assertTrue(out["is_complete"])
+        self.assertEqual(out["config"]["geometry"]["structure"], "single_tubs")
+        self.assertEqual(out["config"]["geometry"]["params"]["child_rmax"], 5.0)
+        self.assertEqual(out["config"]["geometry"]["params"]["child_hz"], 10.0)
+
+    def test_chinese_toward_target_center_phrase_is_understood_by_v2(self) -> None:
+        out = self._run(
+            "10 mm x 10 mm x 10 mm copper box target; "
+            "gamma 点源 1 MeV，位于 (0,0,-20) mm，朝靶心；"
+            "physics FTFP_BERT; output json."
+        )
+        self.assertTrue(out["is_complete"])
+        self.assertEqual(out["config"]["source"]["direction"]["value"], [0.0, 0.0, 1.0])
+
 
 if __name__ == "__main__":
     unittest.main()
